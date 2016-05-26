@@ -2,7 +2,7 @@ package org.dbpedia.extraction.util
 
 import org.apache.commons.compress.compressors.bzip2.{BZip2CompressorInputStream,BZip2CompressorOutputStream}
 import java.util.zip.{GZIPInputStream,GZIPOutputStream}
-import java.io.{InputStream,OutputStream,Reader,Writer,OutputStreamWriter,InputStreamReader,BufferedOutputStream}
+import java.io.{InputStream,OutputStream,Reader,Writer,OutputStreamWriter,InputStreamReader,BufferedOutputStream,BufferedInputStream}
 import scala.io.Codec
 import org.dbpedia.extraction.util.RichReader.wrapReader
 import java.nio.charset.Charset
@@ -63,7 +63,7 @@ object IOUtils {
    * wrap in reader.
    */
   def reader(file: FileLike[_], charset: Charset = Codec.UTF8.charSet): Reader =
-    new InputStreamReader(inputStream(file), charset)
+    new InputStreamReader(new BufferedInputStream(inputStream(file), 20 * 1024 * 1024), charset)
   
   /**
    * open input stream, wrap in unzipper stream if file suffix indicates compressed file,
