@@ -56,7 +56,7 @@ object IOUtils {
    * wrap in writer.
    */
   def writer(file: FileLike[_], charset: Charset = Codec.UTF8.charSet): Writer =
-    new BufferedOutputStream(new OutputStreamWriter(outputStream(file), charset), 20 * 1024 * 1024)
+    new OutputStreamWriter(new BufferedOutputStream(outputStream(file), 20 * 1024 * 1024), charset)
   
   /**
    * open input stream, wrap in unzipper stream if file suffix indicates compressed file,
