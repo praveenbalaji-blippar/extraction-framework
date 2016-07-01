@@ -1,11 +1,13 @@
 package org.dbpedia.extraction.util
 
-import java.util.Locale
+import java.util.logging.{Level, Logger}
+import java.util.{MissingResourceException, Locale}
 
-import org.dbpedia.extraction.config.mappings.wikidata.WikidataExtractorConfigFactory
+import org.dbpedia.extraction.config.mappings.wikidata.{JsonConfig, WikidataExtractorConfigFactory}
 import org.dbpedia.extraction.ontology.{DBpediaNamespace, RdfNamespace}
 
 import scala.collection.mutable.HashMap
+import scala.io.{Codec, Source}
 
 /**
  * Represents a MediaWiki instance and the language used on it. Initially, this class was
@@ -32,6 +34,7 @@ import scala.collection.mutable.HashMap
  */
 class Language private(
   val wikiCode: String,
+  val name: String,
   val isoCode: String,
   val iso639_3: String,
   val dbpediaDomain: String,
@@ -43,13 +46,13 @@ class Language private(
 )
 {
     val locale = new Locale(isoCode)
+
     
     /** 
      * Wikipedia dump files use this prefix (with underscores), e.g. be_x_old, but
      * Wikipedia domains use the wikiCode (with dashes), e.g. http://be-x-old.wikipedia.org
      */
     val filePrefix = wikiCode.replace('-', '_')
-    
     /**
      */
     override def toString = "wiki="+wikiCode+",locale="+locale.getLanguage
@@ -60,12 +63,17 @@ class Language private(
 object Language extends (String => Language)
 {
   implicit val wikiCodeOrdering = Ordering.by[Language, String](_.wikiCode)
+
+  val logger = Logger.getLogger(Language.getClass.getName)
+
+  val wikipediaLanguageUrl = "https://noc.wikimedia.org/conf/langlist"
   
   val map: Map[String, Language] = locally {
     
-    def language(code : String, iso_1: String, iso_3: String): Language = {
+    def language(code : String, name: String, iso_1: String, iso_3: String): Language = {
       new Language(
         code,
+        name,
         iso_1,
         iso_3,
         code+".dbpedia.org",
@@ -76,63 +84,45 @@ object Language extends (String => Language)
         "https://"+code+".wikipedia.org/w/api.php"
       )
     }
-    
-    val languages = new HashMap[String,Language]
-    val langMapFile = WikidataExtractorConfigFactory.createConfig("/wikitoisomap.json")
 
-    for (langEntry <- langMapFile.keys())
-    {
-      langMapFile.getValue(langEntry).get("iso639_1") match {
-        case Some(iso_1) if(iso_1.trim.length > 0) =>
-          languages(langEntry) = language(langEntry, iso_1, langMapFile.getValue(langEntry).get("iso639_3").get)
-        case _ =>
+    val languages = new HashMap[String,Language]
+    val source = Source.fromURL(wikipediaLanguageUrl)(Codec.UTF8)
+    val wikiLanguageCodes = try source.getLines.toList finally source.close
+
+    val specialLangs: JsonConfig = WikidataExtractorConfigFactory.createConfig("/addonlangs.json").asInstanceOf[JsonConfig]
+
+    for ((lang,properties) <- specialLangs.configMap) {
+      {
+        properties.get("dbpediaDomain") match{
+          case Some(dom) => languages(lang) = new Language(
+            properties.get("wikiCode").get,
+            properties.get("name").get,
+            properties.get("isoCode").get,
+            properties.get("iso639_3").get,
+            dom,
+            properties.get("dbpediaUri").get,
+            new DBpediaNamespace(properties.get("resourceUri").get),
+            new DBpediaNamespace(properties.get("propertyUri").get),
+            properties.get("baseUri").get,
+            properties.get("apiUri").get
+          )
+          case None => languages(lang) = language(properties.get("wikiCode").get, properties.get("name").get, properties.get("isoCode").get, properties.get("iso639_3").get)
+        }
       }
     }
-    languages("commons") =
-    new Language(
-      "commons",
-      "en",
-      "eng",
-       // TODO: do DBpedia URIs make sense here? Do we use them at all? Maybe use null instead.
-      "commons.dbpedia.org",
-      "http://commons.dbpedia.org",
-      new DBpediaNamespace("http://commons.dbpedia.org/resource/"),
-      new DBpediaNamespace("http://commons.dbpedia.org/property/"),
-      "http://commons.wikimedia.org",
-      "https://commons.wikimedia.org/w/api.php"
-    )
-    
-    languages("wikidata") =
-    new Language(
-      "wikidata",
-      "en",
-      "eng",
-       // TODO: do DBpedia URIs make sense here? Do we use them at all? Maybe use null instead.
-      "wikidata.dbpedia.org",
-      "http://wikidata.dbpedia.org",
-      new DBpediaNamespace("http://wikidata.dbpedia.org/resource/"),
-      new DBpediaNamespace("http://wikidata.dbpedia.org/property/"),
-      "http://www.wikidata.org",
-      "https://www.wikidata.org/w/api.php"
-    )
 
-
-
-
-
-    languages("mappings") =
-    new Language(
-      "mappings",
-      "en",
-      "eng",
-      // No DBpedia / RDF namespaces for mappings wiki. 
-      "mappings.dbpedia.org",
-      "http://mappings.dbpedia.org",
-      RdfNamespace.MAPPINGS,
-      RdfNamespace.MAPPINGS,
-      "http://mappings.dbpedia.org",
-      "http://mappings.dbpedia.org/api.php"
-    )
+    for (langEntry <- wikiLanguageCodes)
+    {
+      val loc = new Locale(langEntry)
+      try {
+        languages(langEntry) = language(langEntry, loc.getDisplayName, loc.getLanguage, loc.getISO3Language)
+      }
+      catch{
+        case mre : MissingResourceException =>
+          if(!languages.keySet.contains(langEntry))
+            logger.log(Level.WARNING, "Language not found: " + langEntry + ". To extract this language, please edit the addonLanguage.json in core.")
+      }
+    }
 
     languages.toMap // toMap makes immutable
   }
@@ -156,7 +146,12 @@ object Language extends (String => Language)
    * Wikimedia Wikidata
    */
   val Wikidata = map("wikidata")
-  
+
+  /**
+    * Wikimedia Wikidata
+    */
+  val Core = map("core")
+
   /**
    * Gets a language object for a Wikipedia language code.
    * Throws IllegalArgumentException if language code is unknown.
@@ -172,4 +167,5 @@ object Language extends (String => Language)
    * Gets a language object for a Wikipedia language code, or the default if the given code is unknown.
    */
   def getOrElse(code: String, default: => Language) : Language = map.getOrElse(code, default)
+
 }
