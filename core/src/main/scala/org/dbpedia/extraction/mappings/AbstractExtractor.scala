@@ -6,14 +6,14 @@ import java.util.logging.{Level, Logger}
 
 import org.dbpedia.extraction.destinations.{DBpediaDatasets, Quad, QuadBuilder}
 import org.dbpedia.extraction.ontology.Ontology
-import org.dbpedia.extraction.util.Language
+import org.dbpedia.extraction.util.{JsonConfig, Language}
 import org.dbpedia.extraction.wikiparser._
 import org.dbpedia.util.text.ParseExceptionIgnorer
 import org.dbpedia.util.text.html.{HtmlCoder, XmlCodes}
 
 import scala.io.Source
 import scala.language.reflectiveCalls
-import scala.xml.XML
+import scala.xml.{NodeSeq, XML}
 
 /**
  * Extracts page abstracts.
@@ -36,41 +36,49 @@ class AbstractExtractor(
 )
 extends PageNodeExtractor
 {
-    //TODO make this configurable
-    protected def apiUrl: String = "http://localhost:8008/mediawiki/api.php"
 
-    private val maxRetries = 5
+  protected val logger = Logger.getLogger(classOf[AbstractExtractor].getName)
+  this.getClass.getClassLoader.getResource("myproperties.properties")
+  protected val abstractParams = new JsonConfig(this.getClass.getClassLoader.getResource("mediawikiconfig.json"))
+  protected val publicParames = abstractParams.getMap("publicParams")
+  protected val protectedParams = abstractParams.getMap("protectedParams")
+
+  protected val isTestRun = protectedParams.get("isTestRun").get.asBoolean()
+
+  protected val xmlPath = protectedParams.get("apiNormalXmlPath").get.asText().split(",").map(_.trim)
+
+  protected def apiUrl: URL = new URL(publicParames.get("apiUri").get.asText())
+
+  protected val maxRetries = publicParames.get("maxRetries").get.asInt
 
     /** timeout for connection to web server, milliseconds */
-    private val connectMs = 2000
+  protected val connectMs = publicParames.get("connectMs").get.asInt
 
     /** timeout for result from web server, milliseconds */
-    private val readMs = 8000
+  protected val readMs = publicParames.get("readMs").get.asInt
 
     /** sleep between retries, milliseconds, multiplied by CPU load */
-    private val sleepFactorMs = 1000
+  protected val sleepFactorMs = publicParames.get("sleepFactorMs").get.asInt
 
-    private val language = context.language.wikiCode
-
-    private val logger = Logger.getLogger(classOf[AbstractExtractor].getName)
+  protected val language = context.language.wikiCode
 
     //private val apiParametersFormat = "uselang="+language+"&format=xml&action=parse&prop=text&title=%s&text=%s"
-    private val apiParametersFormat = "uselang="+language+"&format=xml&action=query&prop=extracts&exintro=&explaintext=&titles=%s"
+  protected val apiParametersFormat = "uselang="+language + protectedParams.get("apiNormalParametersFormat").get.asText()
 
     // lazy so testing does not need ontology
-    private lazy val shortProperty = context.ontology.properties("rdfs:comment")
+  protected lazy val shortProperty = context.ontology.properties(protectedParams.get("shortProperty").get.asText())
 
     // lazy so testing does not need ontology
-    private lazy val longProperty = context.ontology.properties("abstract")
-    
-    private lazy val longQuad = QuadBuilder(context.language, DBpediaDatasets.LongAbstracts, longProperty, null) _
-    private lazy val shortQuad = QuadBuilder(context.language, DBpediaDatasets.ShortAbstracts, shortProperty, null) _
-    
-    override val datasets = Set(DBpediaDatasets.LongAbstracts, DBpediaDatasets.ShortAbstracts)
+  protected lazy val longProperty = context.ontology.properties(protectedParams.get("longProperty").get.asText())
 
-    private val osBean = java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+  protected lazy val longQuad = QuadBuilder(context.language, DBpediaDatasets.LongAbstracts, longProperty, null) _
+  protected lazy val shortQuad = QuadBuilder(context.language, DBpediaDatasets.ShortAbstracts, shortProperty, null) _
 
-    private val availableProcessors = osBean.getAvailableProcessors()
+  override val datasets = Set(DBpediaDatasets.LongAbstracts, DBpediaDatasets.ShortAbstracts)
+
+    private val osBean = java.lang.management.ManagementFactory.getOperatingSystemMXBean
+
+    private val availableProcessors = osBean.getAvailableProcessors
 
     override def extract(pageNode : PageNode, subjectUri : String, pageContext : PageContext): Seq[Quad] =
     {
@@ -87,7 +95,7 @@ extends PageNodeExtractor
         //Retrieve page text
         var text = retrievePage(pageNode.title /*, abstractWikiText*/)
 
-        text = postProcess(pageNode.title, text)
+        text = postProcess(pageNode.title, replacePatterns(text))
 
         if (text.trim.isEmpty)
           return Seq.empty
@@ -129,17 +137,16 @@ extends PageNodeExtractor
       // Fill parameters
       val parameters = apiParametersFormat.format(titleParam/*, URLEncoder.encode(pageWikiText, "UTF-8")*/)
 
-      val url = new URL(apiUrl)
-      
       for(counter <- 1 to maxRetries)
       {
         try
         {
-          // Send data
-          val conn = url.openConnection
+
+          val conn = apiUrl.openConnection
           conn.setDoOutput(true)
           conn.setConnectTimeout(connectMs)
           conn.setReadTimeout(readMs)
+
           val writer = new OutputStreamWriter(conn.getOutputStream)
           writer.write(parameters)
           writer.flush()
@@ -195,7 +202,8 @@ extends PageNodeExtractor
      * TODO: probably doesn't work for most non-European languages.
      * TODO: analyse ActiveAbstractExtractor, I think this works  quite well there,
      * because it takes the first two or three sentences
-     * @param text
+      *
+      * @param text
      * @param max max length
      * @return result string
      */
@@ -234,20 +242,26 @@ extends PageNodeExtractor
     {
       // for XML format
       val xmlAnswer = Source.fromInputStream(inputStream, "UTF-8").getLines().mkString("")
-      //val text = (XML.loadString(xmlAnswer) \ "parse" \ "text").text.trim
-      var text = (XML.loadString(xmlAnswer) \ "query" \ "pages" \ "page" \ "extract").text.trim
-      text = decodeHtml(text)
+      var text = XML.loadString(xmlAnswer).asInstanceOf[NodeSeq]
 
-      for ((regex, replacement) <- AbstractExtractor.patternsToRemove) {
-        val matches = regex.pattern.matcher(text)
-        if (matches.find()) {
-          text = matches.replaceAll(replacement)
-        }
-      }
-      text
+      for(child <- xmlPath)
+        text = text \ child
+
+      decodeHtml(text.text.trim)
     }
 
-    private def postProcess(pageTitle: WikiTitle, text: String): String =
+    private def replacePatterns(abst: String): String= {
+      var ret = abst
+      for ((regex, replacement) <- AbstractExtractor.patternsToRemove) {
+        val matches = regex.pattern.matcher(ret)
+        if (matches.find()) {
+          ret = matches.replaceAll(replacement)
+        }
+      }
+      ret
+    }
+
+    protected def postProcess(pageTitle: WikiTitle, text: String): String =
     {
       val startsWithLowercase =
       if (text.isEmpty) {

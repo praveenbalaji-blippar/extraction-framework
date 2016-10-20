@@ -42,6 +42,7 @@ object DBpediaDatasets
     val KMLFiles = new Dataset("kml_files", "Description of KML files from Commons")
     val AnchorText = new Dataset("anchor_text", "Texts used in links to refer to Wikipedia articles from other Wikipedia articles.")
     val SurfaceForms = new Dataset("surface_forms", "Texts used to refer to Wikipedia articles. Includes the anchor texts data, the names of redirects pointing to an article and the actual article name.")
+    val Sounds = new Dataset("sounds", "audio files and sounds from Wikipedia articles.")
 
     /**
      * Mapping based
@@ -57,8 +58,8 @@ object DBpediaDatasets
     val OntologyPropertiesDisjointRange = new Dataset("mappingbased-objects-disjoint-range", "Errors detected in the mapping based properties (disjoint range).")
     val OntologyPropertiesDisjointDomain = new Dataset("mappingbased-objects-disjoint-domain", "Errors detected in the mapping based properties (disjoint domain).")
 
-    val LhdDboInstanceTypes = new Dataset("instance_types_lhd_dbo", "Linked Hypernym dataset attaches entity articles with a DBpedia resource or a DBpedia ontology concept as their type. The types are hypernyms mined from articles' free text using hand-crafted lexicosyntactic patterns. This set is its result for DBpedia where the inferred type has an equivalent in the DBpedia ontology.")
-    val LhdExtInstanceTypes = new Dataset("instance_types_lhd_ext", "Linked Hypernym dataset attaches entity articles with a DBpedia resource or a DBpedia ontology concept as their type. The types are hypernyms mined from articles' free text using hand-crafted lexicosyntactic patterns. This set is its result for DBpedia where the inferred type has no known equivalent in the DBpedia ontology.")
+    val LhdDboInstanceTypes = new Dataset("instance_types_lhd_dbo", "Linked Hypernyms Inference dataset attaches entity articles with a DBpedia ontology concept as their type. The types are hypernyms mined from articles' free text using hand-crafted lexico-syntactic patterns, the mapping to DBpedia ontology type was performed with exact string matching and type co-occurrence analysis.")
+    val LhdExtInstanceTypes = new Dataset("instance_types_lhd_ext", "Linked Hypernym Extension dataset attaches entity articles with a DBpedia resource as their type. The types are hypernyms mined from articles' free text using hand-crafted lexicosyntactic patterns. Unlike the  Inference dataset the Extension dataset contains more specific types, since the set of types is not constrained to DBpedia Ontology - any DBpedia resource can serve as a type.")
     val TaxDboInstanceTypes = new Dataset("instance_types_dbtax_dbo", "DBTax is a data-driven approach to convert the Wikipedia category system into an extensive general-purpose taxonomy, the types of which can be automatically assigned to resources. This set is its result for DBpedia where the inferred type has an equivalent in the DBpedia ontology.")
     val TaxExtInstanceTypes = new Dataset("instance_types_dbtax_ext", "DBTax is a data-driven approach to convert the Wikipedia category system into an extensive general-purpose taxonomy, the types of which can be automatically assigned to resources. This set is its result for DBpedia where the inferred type has no known equivalent in the DBpedia ontology.")
     val SDInstanceTypes = new Dataset("instance_types_sdtyped_dbo", "The SDType heuristic can extract probable type information in large, cross-domain databases on noisy data. This is its result for DBpedia which supplements the normally gathered instance types. This set is its result for DBpedia where the inferred type has an equivalent in the DBpedia ontology.")
@@ -84,6 +85,7 @@ object DBpediaDatasets
     val LongAbstracts = new Dataset("long_abstracts", "Full abstracts of Wikipedia articles, usually the first section.")
     val MissingShortAbstracts = new Dataset("missing_short_abstracts")
     val MissingLongAbstracts = new Dataset("missing_long_abstracts")
+    val LinkedAbstracts = new Dataset("linked_abstracts", "This is a temporary dataset for the NIF extraction of Abstracts. It shall be deleted after NIF extraction is finished.")
 
     /**
      * Links
@@ -96,6 +98,7 @@ object DBpediaDatasets
     val OutDegree = new Dataset("out_degree", "Number of links emerging from a Wikipedia article and pointing to another Wikipedia article.")
     val FreebaseLinks = new Dataset("freebase_links", "This file contains the back-links (owl:sameAs) to the Freebase dataset.")
     val GeonamesLinks = new Dataset("geonames_links", "This file contains the back-links (owl:sameAs) to the Geonames dataset.")
+    val CommonsLink = new Dataset("commons_page_links", "Dataset containing links between a language-locale DBpedia instance and DBpedia Commons.")
 
 
     /**
