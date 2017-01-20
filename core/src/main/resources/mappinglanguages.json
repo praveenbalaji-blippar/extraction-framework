@@ -31,6 +31,9 @@
     "code": "220",
     "chapter": true
   },
+  "ru": {
+    "code": "222"
+  },
   "cs": {
     "code": "224",
     "chapter": true
@@ -60,6 +63,10 @@
   "commons": {
     "code": "240"
   },
+  "ko": {
+    "code": "242",
+    "chapter": true
+  },
   "fi": {
     "code": "244"
   },
@@ -72,6 +79,9 @@
   "id": {
     "code": "254",
     "chapter": true
+  },
+  "sr": {
+    "code": "256"
   },
   "ro": {
     "code": "258"
@@ -122,6 +132,9 @@
   },
   "mk": {
     "code": "310"
+  },
+  "be": {
+    "code": "312"
   },
   "cy": {
     "code": "328"
