@@ -1,8 +1,8 @@
 import java.io.File
 
+import org.dbpedia.extraction.config.ConfigUtils
 import org.dbpedia.extraction.ontology.io.OntologyReader
 import org.dbpedia.extraction.sources.XMLSource
-import org.dbpedia.extraction.util.ConfigUtils
 import org.scalatest.{ConfigMap, FunSuite}
 import org.dbpedia.extraction.scripts.SdTypeCreation
 /**
@@ -18,9 +18,9 @@ class SdTypeCreation$BoosterTest extends FunSuite {
       new OntologyReader().read(ontologySource)
     }
 
-    System.out.println(SdTypeCreation.calculateDomainRangeBooster("http://dbpedia.org/ontology/University", "http://dbpedia.org/ontology/numberOfStudents", SdTypeCreation.PredicateDirection.Out, ontology ))
-    System.out.println(SdTypeCreation.calculateDomainRangeBooster("http://dbpedia.org/ontology/EducationalInstitution", "http://dbpedia.org/ontology/numberOfStudents", SdTypeCreation.PredicateDirection.Out, ontology ))
-    System.out.println(SdTypeCreation.calculateDomainRangeBooster("http://dbpedia.org/ontology/University", "http://dbpedia.org/ontology/editing", SdTypeCreation.PredicateDirection.Out, ontology ))
+    System.out.println(SdTypeCreation.calculateDomainRangePenalty("http://dbpedia.org/ontology/University", "http://dbpedia.org/ontology/numberOfStudents", SdTypeCreation.PredicateDirection.Out, ontology ))
+    System.out.println(SdTypeCreation.calculateDomainRangePenalty("http://dbpedia.org/ontology/EducationalInstitution", "http://dbpedia.org/ontology/numberOfStudents", SdTypeCreation.PredicateDirection.Out, ontology ))
+    System.out.println(SdTypeCreation.calculateDomainRangePenalty("http://dbpedia.org/ontology/University", "http://dbpedia.org/ontology/editing", SdTypeCreation.PredicateDirection.Out, ontology ))
   }
 
 }

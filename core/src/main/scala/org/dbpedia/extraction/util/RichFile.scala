@@ -1,10 +1,13 @@
 package org.dbpedia.extraction.util
 
-import java.io.{IOException,File,FilenameFilter,InputStream,FileInputStream,OutputStream,FileOutputStream}
+import java.io._
 import java.util.regex.Pattern
-import RichFile._
+
+import org.dbpedia.extraction.util.RichFile._
+import org.dbpedia.iri.{URI, UriUtils}
+
 import scala.language.implicitConversions
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 object RichFile {
 
@@ -70,9 +73,10 @@ class RichFile(file: File) extends FileLike[File] {
    */
   def relativize(child: File): String = {
     // Note: toURI encodes file paths, getPath decodes them
-    var path = UriUtils.relativize(file.toURI, child.toURI).getPath
-    if (path endsWith "/") path = path.substring(0, path.length() - 1)
-    return path
+    var path = UriUtils.relativize(URI.create(file.toURI).get, URI.create(child.toURI).get).getPath
+    if (path endsWith "/")
+      path = path.substring(0, path.length() - 1)
+    path
   }
 
   /**

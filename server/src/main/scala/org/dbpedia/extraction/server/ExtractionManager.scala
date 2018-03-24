@@ -3,15 +3,21 @@ package org.dbpedia.extraction.server
 import java.io.File
 import java.util.logging.{Level, Logger}
 
+import org.dbpedia.extraction.config.provenance.Dataset
 import org.dbpedia.extraction.destinations.Destination
 import org.dbpedia.extraction.mappings._
 import org.dbpedia.extraction.ontology.Ontology
 import org.dbpedia.extraction.ontology.io.OntologyReader
-import org.dbpedia.extraction.sources.{Source, WikiPage, WikiSource, XMLSource}
-import org.dbpedia.extraction.util.Language
+import org.dbpedia.extraction.sources.{Source, WikiSource, XMLSource}
+import org.dbpedia.extraction.util.{ExtractionRecorder, Language}
 import org.dbpedia.extraction.wikiparser._
 
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
 import scala.xml.Elem
+
+import scala.reflect._
 
 /**
  * Base class for extraction managers.
@@ -55,14 +61,15 @@ abstract class ExtractionManager(
     /**
      * Called by server to update all users of this extraction manager.
      */
-    def updateAll
+    def updateAll()
     
-    protected val parser = WikiParser.getInstance()
+    protected val parser: WikiParser = WikiParser.getInstance()
 
     def extract(source: Source, destination: Destination, language: Language, useCustomExtraction: Boolean = false): Unit = {
       val extract = if (useCustomExtraction) customExtractor(language) else mappingExtractor(language)
       destination.open()
-      for (page <- source) destination.write(extract.extract(page))
+      for (page <- source)
+        destination.write(extract.extract(page, page.uri))
       destination.close()
     }
 
@@ -75,17 +82,8 @@ abstract class ExtractionManager(
         logHandler.setLevel(Level.WARNING)
         logger.addHandler(logHandler)
 
-        // context object that has only this mappingSource
-        val context = new {
-          val ontology = self.ontology
-          val language = lang
-          val redirects: Redirects = new Redirects(Map())
-          val mappingPageSource = mappingsPages
-          val disambiguations = self.disambiguations
-        }
-
         //Load mappings
-        val mappings = MappingsLoader.load(context)
+        val mappings = loadMappings(lang)
         
         if (mappings.templateMappings.isEmpty && mappings.tableMappings.isEmpty)
           logger.severe("no mappings found")
@@ -118,7 +116,7 @@ abstract class ExtractionManager(
     }
 
 
-    protected def loadOntologyPages() =
+    protected def loadOntologyPages(): Map[WikiTitle, PageNode] =
     {
         val source = if (paths.ontologyFile != null && paths.ontologyFile.isFile)
         {
@@ -137,7 +135,7 @@ abstract class ExtractionManager(
         source.map(parser).flatten.map(page => (page.title, page)).toMap
     }
 
-    protected def loadDisambiguations() =
+    protected def loadDisambiguations(): Disambiguations =
     {
         Disambiguations.empty()
     }
@@ -173,7 +171,7 @@ abstract class ExtractionManager(
 
     protected def loadOntology() : Ontology =
     {
-        new OntologyReader().read(ontologyPages.values)
+        new OntologyReader().read(ontologyPages().values)
     }
 
     protected def loadMappingTestExtractors(): Map[Language, WikiPageExtractor] =
@@ -195,12 +193,22 @@ abstract class ExtractionManager(
         CompositeParseExtractor.load(classes,self.getExtractionContext(lang))
     }
 
+  /**
+    * Build the context for all extractors involved
+    * including the config itself
+    * @param lang
+    * @return
+    */
     protected def getExtractionContext(lang: Language) = {
-      new { val ontology = self.ontology
-            val language = lang
-            val mappings = self.mappings(lang)
-            val redirects = self.redirects.getOrElse(lang, new Redirects(Map()))
-            val disambiguations = self.disambiguations
+      new { val ontology: Ontology = self.ontology()
+            val language: Language = lang
+            val mappings: Mappings = self.mappings(lang)
+            val redirects: Redirects = self.redirects.getOrElse(lang, new Redirects(Map()))
+            val disambiguations: Disambiguations = self.disambiguations
+            val configFile: ServerConfiguration = Server.config
+            val nonFreeImages = Seq()
+            val freeImages = Seq()
+            def recorder[T: ClassTag]: ExtractionRecorder[T] = Server.getExtractionRecorder[T](lang)
       }
     }
 
@@ -212,11 +220,15 @@ abstract class ExtractionManager(
     protected def loadMappings(lang : Language) : Mappings =
     {
         val context = new {
-          val ontology = self.ontology
-          val language = lang
+          val ontology: Ontology = self.ontology()
+          val language: Language = lang
           val redirects: Redirects = new Redirects(Map())
-          val mappingPageSource = self.mappingPageSource(lang)
-          val disambiguations = self.disambiguations
+          val mappingPageSource: Traversable[WikiPage] = self.mappingPageSource(lang)
+          val disambiguations: Disambiguations = self.disambiguations
+          val configFile: ServerConfiguration = Server.config
+          val nonFreeImages = Seq()
+          val freeImages = Seq()
+          def recorder[T: ClassTag]: ExtractionRecorder[T] = Server.getExtractionRecorder[T](lang)
         }
 
         MappingsLoader.load(context)
