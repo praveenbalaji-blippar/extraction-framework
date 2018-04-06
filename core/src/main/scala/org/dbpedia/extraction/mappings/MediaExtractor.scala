@@ -3,9 +3,10 @@ package org.dbpedia.extraction.mappings
 import java.util.logging.Logger
 
 import org.dbpedia.extraction.config.mappings.MediaExtractorConfig
-import org.dbpedia.extraction.destinations.{DBpediaDatasets, Quad}
+import org.dbpedia.extraction.config.provenance.DBpediaDatasets
 import org.dbpedia.extraction.ontology.Ontology
 import org.dbpedia.extraction.sources.Source
+import org.dbpedia.extraction.transform.Quad
 import org.dbpedia.extraction.util.{ExtractorUtils, Language, WikiApi, WikiUtil}
 import org.dbpedia.extraction.wikiparser._
 import org.dbpedia.extraction.util.RichString.wrapString
@@ -53,7 +54,7 @@ extends PageNodeExtractor
 
   override val datasets = Set(DBpediaDatasets.Images)
 
-  override def extract(node: PageNode, subjectUri: String, pageContext: PageContext): Seq[Quad] =
+  override def extract(node: PageNode, subjectUri: String): Seq[Quad] =
   {
     if(node.title.namespace != Namespace.Main) return Seq.empty
 
@@ -73,28 +74,28 @@ extends PageNodeExtractor
           val wikipediaMediaUrl = language.baseUri + "/wiki/" + fileNamespaceIdentifier + ":" + mediaFileName
 
           if (firstImage) {
-            quads += new Quad (language, DBpediaDatasets.Images, url, foafThumbnailProperty, thumbnailUrl, sourceNode.sourceUri)
-            quads += new Quad (language, DBpediaDatasets.Images, thumbnailUrl, rdfType, imageClass.uri, sourceNode.sourceUri)
-            quads += new Quad (language, DBpediaDatasets.Images, thumbnailUrl, dcRightsProperty, wikipediaMediaUrl, sourceNode.sourceUri)
-            quads += new Quad (language, DBpediaDatasets.Images, subjectUri, dbpediaThumbnailProperty, thumbnailUrl, sourceNode.sourceUri)
+            quads += new Quad (language, DBpediaDatasets.Images, url, foafThumbnailProperty, thumbnailUrl, sourceNode.sourceIri)
+            quads += new Quad (language, DBpediaDatasets.Images, thumbnailUrl, rdfType, imageClass.uri, sourceNode.sourceIri)
+            quads += new Quad (language, DBpediaDatasets.Images, thumbnailUrl, dcRightsProperty, wikipediaMediaUrl, sourceNode.sourceIri)
+            quads += new Quad (language, DBpediaDatasets.Images, subjectUri, dbpediaThumbnailProperty, thumbnailUrl, sourceNode.sourceIri)
 
           firstImage = false
           }
 
-          quads += new Quad (language, DBpediaDatasets.Images, url, rdfType, imageClass.uri, sourceNode.sourceUri)
-          quads += new Quad (language, DBpediaDatasets.Images, url, dcRightsProperty, wikipediaMediaUrl, sourceNode.sourceUri)
+          quads += new Quad (language, DBpediaDatasets.Images, url, rdfType, imageClass.uri, sourceNode.sourceIri)
+          quads += new Quad (language, DBpediaDatasets.Images, url, dcRightsProperty, wikipediaMediaUrl, sourceNode.sourceIri)
 
-          quads += new Quad (language, DBpediaDatasets.Images, subjectUri, foafDepictionProperty, url, sourceNode.sourceUri)
+          quads += new Quad (language, DBpediaDatasets.Images, subjectUri, foafDepictionProperty, url, sourceNode.sourceIri)
         }
       else if (mediaFileName.matches(MediaExtractorConfig.SoundRegex.regex)) {
-        quads += new Quad (language, DBpediaDatasets.Sounds, url, rdfType, soundClass.uri, sourceNode.sourceUri)
+        quads += new Quad (language, DBpediaDatasets.Sounds, url, rdfType, soundClass.uri, sourceNode.sourceIri)
       }
       else if (mediaFileName.matches(MediaExtractorConfig.VideoRegex.regex)) {
         // Do nothing for videos as of now
       }
 
       // Same quad for every media resource
-      quads += new Quad(language, DBpediaDatasets.Images, subjectUri, mediaItem, dbpediaUrl, sourceNode.sourceUri)
+      quads += new Quad(language, DBpediaDatasets.Images, subjectUri, mediaItem, dbpediaUrl, sourceNode.sourceIri)
     }
 
     quads
@@ -115,7 +116,7 @@ extends PageNodeExtractor
         case TemplateNode(_, children, _, _) =>
         {
           for (property <- children;
-               textNode @ TextNode(text, _) <- property.children;
+               textNode @ TextNode(text, _, _) <- property.children;
                fileName <- MediaExtractorConfig.MediaRegex.findFirstIn(text);
                encodedFileName = if (encodedLinkRegex.findFirstIn(fileName) == None)
                  WikiUtil.wikiEncode(fileName).capitalize(language.locale)
@@ -128,7 +129,7 @@ extends PageNodeExtractor
           searchMedia(children, sections).foreach(s => media += s)
         }
         // match Files included over galleries format("File:<filename>|<futherText>")
-        case (textNode @ TextNode(text, line)) if (text.contains("|")) =>
+        case (textNode @ TextNode(text, line, _)) if (text.contains("|")) =>
         {
           val textArray = text.split("\\|")
           if (textArray.nonEmpty) {

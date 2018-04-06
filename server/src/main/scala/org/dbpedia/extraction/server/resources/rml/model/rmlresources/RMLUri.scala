@@ -2,6 +2,7 @@ package org.dbpedia.extraction.server.resources.rml.model.rmlresources
 
 import org.apache.jena.util.URIref
 
+
 /**
   * Represents a uri
   */

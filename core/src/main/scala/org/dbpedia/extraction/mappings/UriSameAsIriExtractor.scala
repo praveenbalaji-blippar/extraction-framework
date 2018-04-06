@@ -1,12 +1,16 @@
 package org.dbpedia.extraction.mappings
 
-import org.dbpedia.extraction.destinations.{DBpediaDatasets, Quad}
+import org.dbpedia.extraction.config.provenance.DBpediaDatasets
+import org.dbpedia.extraction.transform.{Quad, QuadBuilder}
 import org.dbpedia.extraction.wikiparser.PageNode
-import org.dbpedia.extraction.ontology.Ontology
+import org.dbpedia.extraction.ontology.{Ontology, OntologyProperty}
 import org.dbpedia.extraction.util.Language
-import org.dbpedia.extraction.destinations.QuadBuilder
 import java.net.URI
+
+import org.dbpedia.iri.UriUtils
+
 import scala.language.reflectiveCalls
+import scala.util.{Failure, Success}
 
 /**
  * Extracts sameAs links for resources with themselves. Only makes sense when serialization is
@@ -22,16 +26,22 @@ extends PageNodeExtractor
 {
   private val language = context.language
 
-  val sameAsProperty = context.ontology.properties("owl:sameAs")
+  val sameAsProperty: OntologyProperty = context.ontology.properties("owl:sameAs")
   
   val quad = QuadBuilder(context.language, DBpediaDatasets.UriSameAsIri, sameAsProperty, null) _
 
   override val datasets = Set(DBpediaDatasets.UriSameAsIri)
 
-  override def extract(page: PageNode, subjectUri: String, pageContext: PageContext): Seq[Quad] =
+  override def extract(page: PageNode, subjectUri: String): Seq[Quad] =
   {
     // only extract triple if IRI is actually different from URI
-    if (new URI(subjectUri).toASCIIString() == subjectUri) Seq.empty
-    else Seq(quad(subjectUri, subjectUri, page.sourceUri))
+    val encodedUri = UriUtils.createURI(subjectUri) match{
+      case Success(u) => u.toASCIIString
+      case Failure(f) => throw f
+    }
+    if (encodedUri == subjectUri)
+      Seq.empty
+    else
+      Seq(quad(encodedUri, subjectUri, page.sourceIri))
   }
 }

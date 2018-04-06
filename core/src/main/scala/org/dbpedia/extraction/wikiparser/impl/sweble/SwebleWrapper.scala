@@ -1,38 +1,30 @@
 package org.dbpedia.extraction.wikiparser.impl.sweble
 
-import java.io.{File, StringWriter}
 import java.net.URI
-import java.util
 import java.util.ArrayList
 
+import de.fau.cs.osr.ptk.common.ast.RtData
+import de.fau.cs.osr.ptk.common.{AstVisitor, Warning}
+import org.dbpedia.iri.UriUtils
+import org.sweble.wikitext.engine._
+import org.sweble.wikitext.engine.config.WikiConfigImpl
 import org.sweble.wikitext.engine.nodes.{EngPage, EngProcessedPage}
+import org.sweble.wikitext.engine.utils.DefaultConfigEnWp
+import org.sweble.wikitext.parser.nodes.WtNodeList.WtNodeListImpl
+import org.sweble.wikitext.parser.nodes._
 import org.sweble.wikitext.parser.parser.PreprocessorToParserTransformer
 import org.sweble.wikitext.parser.preprocessor.PreprocessedWikitext
-import org.sweble.wikitext.parser.{WtEntityMap, WtEntityMapImpl, WtRtData, postprocessor}
-import org.sweble.wikitext.parser.nodes._
-import org.sweble.wikitext.parser.postprocessor.TreeBuilder
+import org.sweble.wikitext.parser.{WtEntityMap, WtEntityMapImpl}
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable.ListBuffer
 import scala.language.implicitConversions
-import org.sweble.wikitext.engine.ExpansionVisitor
-
-import collection.mutable.ListBuffer
-import org.sweble.wikitext.parser.nodes.WtNodeList.WtNodeListImpl
-import org.sweble.wikitext.engine.utils.DefaultConfigEnWp
-import org.sweble.wikitext.engine.config.WikiConfig
-import org.sweble.wikitext.engine.config.WikiConfigImpl
-import org.sweble.wikitext.engine._
-import de.fau.cs.osr.ptk.common.ast.{AstNode, RtData}
-import de.fau.cs.osr.ptk.common.{AstPrinter, AstVisitor, Warning}
-import org.sweble.wikitext.engine.ext.parser_functions.ParserFunctionIf
-import org.sweble.wikitext.parser.nodes.WtBody.WtBodyImpl
-import org.sweble.wikitext.parser.nodes.WtLinkTarget.LinkTargetType
+import scala.util.{Failure, Success}
 //import de.fau.cs.osr.ptk.nodegen.parser._
 
 
+import org.dbpedia.extraction.util.{Language, WikiUtil}
 import org.dbpedia.extraction.wikiparser._
-import org.dbpedia.extraction.sources.WikiPage
-import org.dbpedia.extraction.util.{UriUtils, WikiUtil, Language}
 
 
 /**
@@ -74,7 +66,7 @@ final class SwebleWrapper extends WikiParser
 
 
         //TODO dont transform, refactor all extractors instead
-        Some(transformAST(page, false, false, parsed))
+        Some(transformAST(page, parsed))
     }
 
     def parse(pageId : PageId, wikitext : String) : EngPage = {
@@ -87,7 +79,7 @@ final class SwebleWrapper extends WikiParser
 
     // The start_line param is for cases when I am rerunning the parser on a subtext and hence need
     // to adjust for the line numbers
-    def transformAST(page: WikiPage, isRedirect : Boolean, isDisambiguation : Boolean, swebleTree : EngPage, start_line : Int = 0) : PageNode = {
+    def transformAST(page: WikiPage, swebleTree : EngPage, start_line : Int = 0) : PageNode = {
         //parse template arguments
 
        // new ParameterToDefaultValueResolver(pageId).go(swebleTree)
@@ -97,7 +89,7 @@ final class SwebleWrapper extends WikiParser
         val nodesClean = mergeConsecutiveTextNodes(nodes)
         //println(nodesClean)
         new PageNode(page.title, page.id, page.revision, page.timestamp,
-            page.contributorID,  page.contributorName, isRedirect, isDisambiguation, nodesClean)
+            page.contributorID,  page.contributorName, page.source, nodesClean)
     }
 
     def transformNodes(nl : WtNodeListImpl, start_line : Int) : List[Node] = {
@@ -250,42 +242,40 @@ final class SwebleWrapper extends WikiParser
                 val target2 = if(target != null && !target.equals("")){ if(target.startsWith("#")) target.substring(1) else target} else "none"
                 val destinationURL = WikiTitle.parse(target2.asInstanceOf[WtPageName].get(0).asInstanceOf[WtText].getContent, language)
 
-                val destinationNodes = List[Node](new TextNode(il.getTarget, start_line + line)) //parsing of target not yet supported
-                val titleNodes = if(!il.getTitle.isEmpty){transformNodes(il.getTitle, start_line)} else {List(new TextNode(il.getTarget, start_line + line))}
+                val destinationNodes = List[Node](TextNode(il.getTarget, start_line + line)) //parsing of target not yet supported
+                val titleNodes = if(!il.getTitle.isEmpty){transformNodes(il.getTitle, start_line)} else {List(TextNode(il.getTarget, start_line + line))}
 
                 val postfix : List[Node] = if(il.getPostfix != null && il.getPostfix != ""){
-                    List(new TextNode(il.getPostfix, start_line + line))
+                    List(TextNode(il.getPostfix, start_line + line))
                 } else List()
 
                 if (destinationURL.language == language) {
-                    List(new InternalLinkNode(destinationURL, titleNodes, start_line + line, destinationNodes)) ++ postfix
+                    List(InternalLinkNode(destinationURL, titleNodes, start_line + line, destinationNodes)) ++ postfix
                 } else {
-                    List(new InterWikiLinkNode(destinationURL, titleNodes, start_line + line, destinationNodes)) ++ postfix
+                    List(InterWikiLinkNode(destinationURL, titleNodes, start_line + line, destinationNodes)) ++ postfix
                 }
             }
             case el : WtExternalLink => {
-                var destinationURL : URI = null
-                try {
-                    destinationURL = new URI(el.getTarget)
-                } catch {
-                    case e : Exception => destinationURL = new URI("http://example.org")
+                val destinationURL = UriUtils.createURI(el.getTarget) match{
+                    case Success(u) => u
+                    case Failure(f) => UriUtils.createURI("http://example.org").get
                 }
-                val destinationNodes = List[Node](new TextNode(el.getTarget.toString, start_line + line)) //parsing of target not yet supported
+                val destinationNodes = List[Node](TextNode(el.getTarget.toString, start_line + line)) //parsing of target not yet supported
                 val titleNodes = transformNodes(el.getTitle, start_line)
-                List(new ExternalLinkNode(destinationURL, titleNodes, start_line + line, destinationNodes))
+                List(ExternalLinkNode(destinationURL, titleNodes, start_line + line, destinationNodes))
             }
             case url : WtUrl => {
-                val destinationURL = new URI(url)
-                val destinationNodes = List[Node](new TextNode(url, start_line + line)) //parsing of target not yet supported
-                List(new ExternalLinkNode(destinationURL, destinationNodes, start_line + line, destinationNodes))
+                val destinationURL = UriUtils.createURI(url).get
+                val destinationNodes = List[Node](TextNode(url, start_line + line)) //parsing of target not yet supported
+                List(ExternalLinkNode(destinationURL, destinationNodes, start_line + line, destinationNodes))
             }
-            case items : WtUnorderedList => items.iterator.toList.map( (n:WtNode) => {
+            case items : WtUnorderedList => items.iterator.toList.flatMap((n: WtNode) => {
                 n match {
-                    case item : WtListItem => wrap(item,  line, start_line)
-                    case item : WtText => List(new TextNode(item.getContent, start_line + line))
+                    case item: WtListItem => wrap(item, line, start_line)
+                    case item: WtText => List(TextNode(item.getContent, start_line + line))
                     case _ => throw new Exception("expected ItemizationItem as Itemization child")
                 }
-            }).flatten
+            })
             case items : WtOrderedList => {
                 var i = 0
                 items.iterator.toList.map( (n:WtNode) => {

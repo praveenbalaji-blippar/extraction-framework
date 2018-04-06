@@ -1,7 +1,9 @@
 package org.dbpedia.extraction.mappings
 
+import org.dbpedia.extraction.config.provenance.DBpediaDatasets
+import org.dbpedia.extraction.transform.Quad
+
 import scala.language.reflectiveCalls
-import org.dbpedia.extraction.destinations.{DBpediaDatasets, Quad}
 import org.dbpedia.extraction.ontology.Ontology
 import org.dbpedia.extraction.util.Language
 import org.dbpedia.extraction.wikiparser.{PageNode, TextNode, WikiTitle}
@@ -34,7 +36,7 @@ class CommonsResourceExtractor (
 
   override val datasets = Set(DBpediaDatasets.CommonsLink)
 
-  override def extract(node : PageNode, subjectUri : String, pageContext : PageContext) : Seq[Quad] ={
+  override def extract(node : PageNode, subjectUri : String) : Seq[Quad] ={
 
     val quads = new ArrayBuffer[Quad]()
 
@@ -44,10 +46,10 @@ class CommonsResourceExtractor (
     {
       if (template.children.isEmpty){
         val commonsResourceURL = WikiTitle.parse(node.title.encoded.asInstanceOf[String], commonsLanguage).resourceIri
-        return Seq(new Quad(context.language, DBpediaDatasets.CommonsLink, subjectUri, propertyUri, commonsResourceURL, null, null))
+        return Seq(new Quad(context.language, DBpediaDatasets.CommonsLink, subjectUri, propertyUri, commonsResourceURL, node.sourceIri, null))
       } else{
         val commonsResourceURL = WikiTitle.parse(template.children.head.children.head.asInstanceOf[TextNode].text, commonsLanguage).resourceIri
-        return Seq(new Quad(context.language, DBpediaDatasets.CommonsLink, subjectUri, propertyUri, commonsResourceURL, null, null))
+        return Seq(new Quad(context.language, DBpediaDatasets.CommonsLink, subjectUri, propertyUri, commonsResourceURL, node.sourceIri, null))
       }
     }
     Seq.empty

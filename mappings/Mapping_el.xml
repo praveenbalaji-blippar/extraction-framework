@@ -2787,6 +2787,38 @@
 
 
 
+}}</text></revision></page><page><title>Mapping el:Κουτί πληροφοριών ορυκτού</title><ns>304</ns><id>11825</id><revision><id>51984</id><timestamp>2017-03-08T10:48:41Z</timestamp><text>{{TemplateMapping
+| mapToClass = Mineral
+| mappings =
+        {{PropertyMapping | templateProperty = Όνομα | ontologyProperty = foaf:name }}
+        {{PropertyMapping | templateProperty = Εικόνα  | ontologyProperty = image }}
+        {{PropertyMapping | templateProperty = Λεζάντα | ontologyProperty = rdfs:caption }}
+        {{PropertyMapping | templateProperty = Κατηγορία | ontologyProperty = category }}
+        {{PropertyMapping | templateProperty = Χημικός τύπος | ontologyProperty = formula }}
+        {{PropertyMapping | templateProperty = Μοριακό βάρος | ontologyProperty = molweight }}
+        {{PropertyMapping | templateProperty = Πυκνότητα | ontologyProperty = density | unit = Density }}
+        {{PropertyMapping | templateProperty = Χρώμα | ontologyProperty = color }}
+        {{PropertyMapping | templateProperty = Χρώμα | ontologyProperty = colour }}
+        {{PropertyMapping | templateProperty = Σύστημα κρυστάλλωσης | ontologyProperty = system }}
+        {{PropertyMapping | templateProperty = Κρύσταλλοι | ontologyProperty = class }}
+        {{PropertyMapping | templateProperty = Υφή | ontologyProperty = fracture }}
+        {{PropertyMapping | templateProperty = Διδυμία | ontologyProperty = twinning }}
+        {{PropertyMapping | templateProperty = Σκληρότητα | ontologyProperty = mohs }}
+        {{PropertyMapping | templateProperty = Σχισμός | ontologyProperty = cleavage }}
+        {{PropertyMapping | templateProperty = Θραύση | ontologyProperty = tenacity }}
+        {{PropertyMapping | templateProperty = Σημείο τήξης | ontologyProperty = melt | unit = Temperature }}
+        {{PropertyMapping | templateProperty = Ειδικό βάρος | ontologyProperty = gravity }}
+        {{PropertyMapping | templateProperty = Λάμψη | ontologyProperty = luster }}
+        {{PropertyMapping | templateProperty = Λάμψη | ontologyProperty = lustre }}
+        {{PropertyMapping | templateProperty = Λάμψη | ontologyProperty = polish }}
+        {{PropertyMapping | templateProperty = Λάμψη | ontologyProperty = polish lustre  }}
+        {{PropertyMapping | templateProperty = Γραμμή κόνεως | ontologyProperty = streak }}
+        {{PropertyMapping | templateProperty = Πλεοχρωισμός | ontologyProperty = pleochroism }}
+        {{PropertyMapping | templateProperty = Διαφάνεια | ontologyProperty = diaphaneity }}
+        {{PropertyMapping | templateProperty = Παρατηρήσεις | ontologyProperty = other }}
+        {{PropertyMapping | templateProperty = Ανευρίσκεται | ontologyProperty = habit }}
+        {{PropertyMapping | templateProperty = Παραλλαγές | ontologyProperty = alteration }}
+        {{PropertyMapping | templateProperty = Αναφορές | ontologyProperty = references }}
 }}</text></revision></page><page><title>Mapping el:Κουτί πληροφοριών παίχτη γκολφ</title><ns>304</ns><id>9694</id><revision><id>36782</id><timestamp>2014-07-09T17:19:43Z</timestamp><text></text></revision></page><page><title>Mapping el:Κουτί πληροφοριών περιοδικού</title><ns>304</ns><id>3067</id><revision><id>32138</id><timestamp>2014-02-24T21:22:29Z</timestamp><text>{{TemplateMapping
 | mapToClass = Magazine
 | mappings =
@@ -3532,6 +3564,19 @@
 	{{PropertyMapping | templateProperty = συναφή είδη | ontologyProperty = musicFusionGenre }}
         {{PropertyMapping | templateProperty = μουσικοί | ontologyProperty = artist }}
 
+}}</text></revision></page><page><title>Mapping el:Μυς</title><ns>304</ns><id>11691</id><revision><id>51135</id><timestamp>2016-06-02T17:45:08Z</timestamp><text>{{TemplateMapping
+| mapToClass = Muscle
+| mappings =
+	{{PropertyMapping | templateProperty = Όνομα | ontologyProperty = foaf:name }}
+	{{PropertyMapping | templateProperty = Λατινικά | ontologyProperty = foaf:name }}
+        {{PropertyMapping | templateProperty = Image | ontologyProperty = foaf:thumbnail}}
+        {{PropertyMapping | templateProperty = Image2 | ontologyProperty = foaf:thumbnail}}
+	{{PropertyMapping | templateProperty = Κεφάλαιο_Gray | ontologyProperty = graySubject }}
+	{{PropertyMapping | templateProperty = Νεύρο | ontologyProperty = nerve }}
+        {{PropertyMapping | templateProperty = Φλέβα | ontologyProperty = vein }}
+        {{PropertyMapping | templateProperty = Σύστημα | ontologyProperty = organSystem }}
+	{{PropertyMapping | templateProperty = MeSH name | ontologyProperty = meshName }}
+        {{PropertyMapping | templateProperty = Αρτηρία | ontologyProperty = artery }}
 }}</text></revision></page><page><title>Mapping el:Νησί</title><ns>304</ns><id>2402</id><revision><id>21464</id><timestamp>2012-12-30T09:04:18Z</timestamp><text>{{TemplateMapping
 | mapToClass = Island
 | mappings =
@@ -5658,7 +5703,7 @@
 {{PropertyMapping | templateProperty = μάζα | ontologyProperty =  mass | unit = Mass }}
 {{PropertyMapping | templateProperty = πηγή | ontologyProperty =  mass | unit = origin }}
 
-}}</text></revision></page><page><title>Mapping el:Πόλη</title><ns>304</ns><id>2403</id><revision><id>32270</id><timestamp>2014-03-04T07:54:12Z</timestamp><text>{{TemplateMapping
+}}</text></revision></page><page><title>Mapping el:Πόλη</title><ns>304</ns><id>2403</id><revision><id>51505</id><timestamp>2016-09-17T08:34:16Z</timestamp><text>{{TemplateMapping
 | mapToClass = City
 | mappings =
 	{{PropertyMapping | templateProperty = Περιφέρεια  | ontologyProperty = region }}
