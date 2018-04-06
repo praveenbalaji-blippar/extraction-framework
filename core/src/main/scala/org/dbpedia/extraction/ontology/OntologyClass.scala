@@ -1,9 +1,7 @@
 package org.dbpedia.extraction.ontology
 
 import org.dbpedia.extraction.util.Language
-
-import scala.collection.mutable
-import scala.collection.mutable.{ArrayBuffer, Buffer, ListBuffer}
+import scala.collection.mutable.{Buffer,ArrayBuffer}
 
 /**
  * Represents an ontology class.
@@ -51,34 +49,9 @@ extends OntologyType(name, labels, comments)
         equivalentClasses.foreach(_.collectClasses(classes))
         baseClasses.foreach(_.collectClasses(classes))
       }
-    }
+    } 
 
-  lazy val superClasses: Map[Int, List[OntologyClass]] = {
-    val ret = new mutable.HashMap[Int, mutable.ListBuffer[OntologyClass]]()
-    collectSuperClasses(ret, 1)
-    ret.map(x => x._1 -> x._2.toList).toMap
-  }
-
-  private def collectSuperClasses(classMap: mutable.HashMap[Int, mutable.ListBuffer[OntologyClass]], depth: Int): Unit = {
-    // Note: If this class was already collected, we do nothing, so we silently skip cycles in
-    // class relations here. Some cycles are allowed (for example between equivalent classes,
-    // but there are other cases), others aren't. At this point, it's not easy to distinguish valid
-    // and invalid cycles, so we ignore them all. Cycles should be checked when classes are loaded.
-    // Note: a set would be nicer than a buffer to check contains(), but we want to keep the order.
-    if (! classMap.values.flatten.toList.contains(this)) {
-      classMap.get(depth) match{
-        case Some(l) => l += this
-        case None => classMap += {
-          val lb = new ListBuffer[OntologyClass]()
-          lb += this
-          depth -> lb
-        }
-      }
-      baseClasses.foreach(_.collectSuperClasses(classMap, depth+1))
-    }
-  }
-
-  override val uri = RdfNamespace.fullUri(DBpediaNamespace.ONTOLOGY, name)
+    override val uri = RdfNamespace.fullUri(DBpediaNamespace.ONTOLOGY, name)
 
     val isExternalClass = ! uri.startsWith(DBpediaNamespace.ONTOLOGY.namespace)
 }

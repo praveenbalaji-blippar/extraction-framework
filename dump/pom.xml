@@ -17,6 +17,7 @@
 	<build>
 		<plugins>
 			<plugin>
+
 				<groupId>net.alchim31.maven</groupId>
 				<artifactId>scala-maven-plugin</artifactId>
 				<executions>
@@ -28,6 +29,7 @@
 						</goals>
 					</execution>
 				</executions>
+
 				<configuration>
 					<launchers>
 
@@ -36,28 +38,27 @@
 							<mainClass>org.dbpedia.extraction.dump.sql.Import</mainClass>
 							<jvmArgs>
 								<jvmArg>-server</jvmArg>
-								<jvmArg>-DtotalEntitySizeLimit=0</jvmArg>
-								<jvmArg>-Djdk.xml.totalEntitySizeLimit=0</jvmArg>
+								<jvmArg>-DtotalEntitySizeLimit=2147480000</jvmArg>
+								<jvmArg>-Djdk.xml.totalEntitySizeLimit=2147480000</jvmArg>
 							</jvmArgs>
 							<args>
-								<!-- ALL PARAMS MOVED TO: mysql.import.properties !!!!!!!!!!!!!!
-								
-								<arg>/data/extraction-data/2016-10</arg>-->
-								<!-- location of SQL file containing MediaWiki table definitions
-								<arg>/home/extractor/mediawikiTables.sql</arg>-->
+								<!-- base folder of downloaded dumps -->
+								<arg>/data/extraction-data/2016-04</arg>
+								<!-- location of SQL file containing MediaWiki table definitions -->
+								<arg>/home/extractor/mediawikiTables.sql</arg>
 								<!-- JDBC URL of MySQL server. Import creates a new database for 
-									each wiki.
-								<arg>jdbc:mysql://localhost/?characterEncoding=UTF-8&amp;user=root</arg>-->
-								<!-- require-download-complete
-								<arg>true</arg> -->
-								<!-- file name: pages-articles.xml{,.bz2,.gz}
-								<arg>pages-articles.xml.bz2</arg>-->
+									each wiki. -->
+								<arg>jdbc:mysql://localhost/?characterEncoding=UTF-8&amp;user=root</arg>
+								<!-- require-download-complete -->
+								<arg>true</arg> 
+								<!-- file name: pages-articles.xml{,.bz2,.gz} -->
+								<arg>pages-articles.xml.bz2</arg>
 								<!-- number of parallel imports; this number depends on the number of processors in use
-									and the type of hard disc (hhd/ssd) and how many parallel files reads it can support
-								<arg>16</arg>-->
+									and the type of hard disc (hhd/ssd) and how many parallel files reads it can support -->
+								<arg>1</arg>
 								<!-- languages and article count ranges, comma-separated, e.g. "de,en" 
-									or "@mappings" etc.
-								<arg>@downloaded</arg>-->
+									or "@mappings" etc. -->
+								<arg>@downloaded</arg>
 							</args>
 						</launcher>
 
@@ -67,11 +68,10 @@
 
 							<jvmArgs>
 								<jvmArg>-server</jvmArg>
-								<jvmArg>-DtotalEntitySizeLimit=0</jvmArg>
-								<jvmArg>-Djdk.xml.totalEntitySizeLimit=0</jvmArg>
-								<jvmArg>-Xmx16G</jvmArg>
-								<jvmArg>-XX:+HeapDumpOnOutOfMemoryError</jvmArg>
-								<!-- <jvmArg>-XX:+UseConcMarkSweepGC</jvmArg> <jvmArg>-XX:+PrintGC</jvmArg> <jvmArg>-XX:+PrintGCTimeStamps</jvmArg>
+								<jvmArg>-DtotalEntitySizeLimit=2147480000</jvmArg>
+								<jvmArg>-Djdk.xml.totalEntitySizeLimit=2147480000</jvmArg>
+								<!-- <jvmArg>-Xmx4096m</jvmArg> <jvmArg>-XX:+HeapDumpOnOutOfMemoryError</jvmArg>
+									<jvmArg>-XX:+UseConcMarkSweepGC</jvmArg> <jvmArg>-XX:+PrintGC</jvmArg> <jvmArg>-XX:+PrintGCTimeStamps</jvmArg> 
 									<jvmArg>-Dhttp.proxyHost=proxy.server.com</jvmArg> <jvmArg>-Dhttp.proxyPort=80</jvmArg> 
 									<jvmArg>-Dhttp.proxyUser=user</jvmArg> <jvmArg>-Dhttp.proxyPassword=password</jvmArg> 
 									<jvmArg>-Dhttp.nonProxyHosts="localhost|127.0.0.1"</jvmArg> -->
@@ -81,10 +81,9 @@
 						<launcher>
 							<id>stats-extraction</id>
 							<mainClass>org.dbpedia.extraction.dump.extract.Extraction</mainClass>
+
 							<jvmArgs>
 								<jvmArg>-server</jvmArg>
-								<jvmArg>-DtotalEntitySizeLimit=0</jvmArg>
-								<jvmArg>-Djdk.xml.totalEntitySizeLimit=0</jvmArg>
 								<!-- Request statistics -->
 								<jvmArg>-Dextract.template.stats=true</jvmArg>
 								<!-- <jvmArg>-Xmx4096m</jvmArg> <jvmArg>-XX:+HeapDumpOnOutOfMemoryError</jvmArg> 
@@ -99,8 +98,6 @@
 							<id>compress</id>
 							<mainClass>org.dbpedia.extraction.dump.compress.Compress</mainClass>
 							<jvmArgs>
-								<jvmArg>-DtotalEntitySizeLimit=0</jvmArg>
-								<jvmArg>-Djdk.xml.totalEntitySizeLimit=0</jvmArg>
 								<jvmArg>-Xmx1024m</jvmArg>
 							</jvmArgs>
 							<!-- mvn scala:run -Dlauncher=Compress "-DaddArgs=/data|/data-compressed" -->
@@ -126,10 +123,6 @@
 								<arg>*.sql.gz,*.xml.bz2,*.sql,*-pages-articles.xml,index.html</arg><!-- 
 									delete these files -->
 							</args>
-							<jvmArgs>
-								<jvmArg>-DtotalEntitySizeLimit=0</jvmArg>
-								<jvmArg>-Djdk.xml.totalEntitySizeLimit=0</jvmArg>
-							</jvmArgs>
 						</launcher>
 
 						<launcher>
@@ -142,11 +135,15 @@
 								<arg>*.nt,*.nq,*.tql,*.ttl,*.trix,*-redirects.obj</arg><!-- delete 
 									these files -->
 							</args>
-							<jvmArgs>
-								<jvmArg>-DtotalEntitySizeLimit=0</jvmArg>
-								<jvmArg>-Djdk.xml.totalEntitySizeLimit=0</jvmArg>
-							</jvmArgs>
 						</launcher>
+                        <launcher>
+                            <id>SlackForwarder</id>
+                            <mainClass>org.dbpedia.extraction.scripts.SlackForwarder</mainClass>
+                            <jvmArgs>
+                                <jvmArg>-server</jvmArg>
+                                <jvmArg>-XX:+UseConcMarkSweepGC</jvmArg>
+                            </jvmArgs>
+                        </launcher>
 					</launchers>
 				</configuration>
 
@@ -170,12 +167,6 @@
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
 			<version>5.1.20</version>
-		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.jsoup/jsoup -->
-		<dependency>
-			<groupId>org.jsoup</groupId>
-			<artifactId>jsoup</artifactId>
-			<version>1.8.3</version>
 		</dependency>
 
 	</dependencies>

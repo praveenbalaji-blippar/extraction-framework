@@ -3,13 +3,12 @@ package org.dbpedia.extraction.server.stats
 import java.io.File
 import java.util.logging.Logger
 
-import org.dbpedia.extraction.config.provenance.{DBpediaDatasets, Dataset}
-import org.dbpedia.extraction.util.Finder
+import org.dbpedia.extraction.destinations.{Dataset,DBpediaDatasets}
 import org.dbpedia.extraction.util.RichFile.wrapFile
 import org.dbpedia.extraction.util.StringUtils.prettyMillis
+import org.dbpedia.extraction.util.{Finder,Language}
+import org.dbpedia.extraction.util.Language.wikiCodeOrdering
 import org.dbpedia.extraction.wikiparser.Namespace
-
-import org.dbpedia.extraction.config.ConfigUtils._
 
 /**
  * Script to gather statistics about templates and properties:
@@ -41,7 +40,7 @@ import org.dbpedia.extraction.config.ConfigUtils._
  */
 object CreateMappingStats
 {
-    val logger: Logger = Logger.getLogger(getClass.getName)
+    val logger = Logger.getLogger(getClass.getName)
     
     def main(args: Array[String])
     {
@@ -56,10 +55,10 @@ object CreateMappingStats
         val pretty = args(3).toBoolean
         
         // Use all remaining args as language codes or comma or whitespace separated lists of codes
-        var languages = parseLanguages(inputDir, args.drop(4))
+        var languages: Seq[Language] = for(arg <- args.drop(4); lang <- arg.split("[,\\s]"); if (lang.nonEmpty)) yield Language(lang)
           
         // if no languages are given, use all languages for which a mapping namespace is defined
-        if (languages.isEmpty) languages = Namespace.mappings.keySet.toArray
+        if (languages.isEmpty) languages = Namespace.mappings.keySet.toSeq
         
         languages.sorted.par.foreach(language =>  {
           
@@ -74,7 +73,7 @@ object CreateMappingStats
             val date = finder.dates("extraction-complete").last
             
             def inputFile(dataset: Dataset): File = {
-              finder.file(date, dataset.encoded.replace('_', '-')+".ttl"+suffix).get
+              finder.file(date, dataset.name.replace('_', '-')+".ttl"+suffix).get
             }
             
             // extracted by org.dbpedia.extraction.mappings.RedirectExtractor

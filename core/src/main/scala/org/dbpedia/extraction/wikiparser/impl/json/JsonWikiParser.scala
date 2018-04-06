@@ -3,8 +3,9 @@ package org.dbpedia.extraction.wikiparser.impl.json
 import java.nio.channels.NonReadableChannelException
 
 import com.fasterxml.jackson.databind.{JsonMappingException, DeserializationFeature, ObjectMapper}
+import org.dbpedia.extraction.sources.WikiPage
 import org.dbpedia.extraction.util.WikidataUtil
-import org.dbpedia.extraction.wikiparser.{WikiPage, JsonNode, Namespace}
+import org.dbpedia.extraction.wikiparser.{JsonNode, Namespace}
 import org.wikidata.wdtk.datamodel.json.jackson.{JacksonTermedStatementDocument, JacksonPropertyDocument, JacksonItemDocument}
 
 import scala.util.matching.Regex
@@ -41,7 +42,7 @@ class JsonWikiParser {
         getJacksonDocument(page,page.source)
       } catch {
         case e: JsonMappingException => {
-          if (page.isRedirect){
+          if (page.redirect!=null){
             None //redirect page, nothing to extract
           } else {
             getJacksonDocument(page,fixBrokenJson(page.source))

@@ -3,11 +3,10 @@ package org.dbpedia.extraction.wikiparser
 import java.util.logging.Logger
 import java.net.{URI, URISyntaxException}
 
-import org.apache.jena.iri.IRIException
 import org.dbpedia.extraction.util.Language
-import org.dbpedia.iri.{IRISyntaxException, UriUtils}
+import org.dbpedia.extraction.util.UriUtils
 
-import scala.util.{Failure, Success}
+import scala.collection.mutable.ListBuffer
 
 /**
  * Utility functions for working with nodes.
@@ -24,7 +23,7 @@ object NodeUtil
 
         for(child <- node.children) child match
         {
-            case TextNode(text, line, _) =>
+            case TextNode(text, line) =>
             {
                 val sb = new StringBuilder()
 
@@ -68,23 +67,16 @@ object NodeUtil
         propertyNode
     }
 
-    private def buildPropertyNode(
-                                   text : String,
-                                   line : Int,
-                                   articleLanguage : Language,
-                                   transformCmd : String,
-                                   transformFunc : String => String,
-                                   literalLang: Language = null
-                                 ) : Node = {
+    private def buildPropertyNode(text : String, line : Int, language : Language, transformCmd : String, transformFunc : String => String) : Node = {
 
-        val textNode = TextNode(transformFunc(text), line, literalLang)
+        val textNode = new TextNode(transformFunc(text), line)
 
         transformCmd match
         {
-            case "internal" => InternalLinkNode(WikiTitle.parse(textNode.text, articleLanguage), List(textNode), line)
+            case "internal" => new InternalLinkNode(WikiTitle.parse(textNode.text, language), List(textNode), line)
             case "external" => try {
                 if (UriUtils.hasKnownScheme(textNode.text))
-                    ExternalLinkNode(UriUtils.createURI(textNode.text).get, List(textNode), line)
+                    new ExternalLinkNode(new URI(textNode.text), List(textNode), line)
                 else
                     textNode
             } catch {
@@ -111,7 +103,7 @@ object NodeUtil
 
         for(child <- inputNode.children) child match
         {
-            case TextNode(text, line, lang) =>
+            case TextNode(text, line) =>
             {
                 val parts = text.split(fullRegex, -1)
 
@@ -119,9 +111,9 @@ object NodeUtil
                 {
                     if(parts.size > 1 && i < parts.size - 1)
                     {
-                        if(parts(i).nonEmpty) {
+                        if(parts(i).size > 0) {
 
-                          val currentNode = buildPropertyNode(parts(i), line, inputNode.root.title.language, transformCmd, transformFunc, lang)
+                          val currentNode = buildPropertyNode(parts(i), line, inputNode.root.title.language, transformCmd, transformFunc)
 
                           currentNodes = currentNode :: currentNodes
                         }
@@ -131,9 +123,9 @@ object NodeUtil
                     }
                     else
                     {
-                        if(parts(i).nonEmpty) {
+                        if(parts(i).size > 0) {
 
-                          val currentNode = buildPropertyNode(parts(i), line, inputNode.root.title.language, transformCmd, transformFunc, lang)
+                          val currentNode = buildPropertyNode(parts(i), line, inputNode.root.title.language, transformCmd, transformFunc)
 
                           currentNodes = currentNode :: currentNodes
                         }
@@ -143,20 +135,20 @@ object NodeUtil
             case ExternalLinkNode(destinationURI, children, line, destinationNodes) =>
                 // In case of an external link node, transform the URI using the
                 // transform function and attempt to use the result as a URI.
-                UriUtils.createURI(transformFunc(destinationURI.toString)) match{
-                    case Success(u) => currentNodes = ExternalLinkNode(u, children, line, destinationNodes) :: currentNodes
-                    case Failure(f) => f match{
-                        // If the new URI doesn't make syntactical sense, produce
-                        // a warning and don't modify the original node.
-                        case e: IRISyntaxException => {
-                            Logger.getLogger(NodeUtil.getClass.getName).warning(
-                                "(while processing template '" + inputTemplateNode.title.decodedWithNamespace +
-                                  "', property '" + inputNode.key + "')" +
-                                  f" Adding prefix or suffix to '$child%s' caused an error, skipping: " + e.getMessage
-                            )
-                            currentNodes = child :: currentNodes
-                        }
-                        case _ => throw f
+                try {
+                    currentNodes = new ExternalLinkNode(
+                        new URI(transformFunc(destinationURI.toString)),
+                        children, line, destinationNodes) :: currentNodes
+                } catch {
+                    // If the new URI doesn't make syntactical sense, produce
+                    // a warning and don't modify the original node.
+                    case e: URISyntaxException => {
+                        Logger.getLogger(NodeUtil.getClass.getName).warning(
+                            "(while processing template '" + inputTemplateNode.title.decodedWithNamespace + 
+                            "', property '" + inputNode.key + "')" +
+                            f" Adding prefix or suffix to '$child%s' caused an error, skipping: " + e.getMessage
+                        )
+                        currentNodes = child :: currentNodes
                     }
                 }
             case _ => currentNodes = child :: currentNodes
@@ -193,7 +185,7 @@ object NodeUtil
 
         for(child <- inputNodes) child match
         {
-            case TextNode(text, line, _) =>
+            case TextNode(text, line) =>
             {
                 val parts = text.split(fullRegex, -1)
 

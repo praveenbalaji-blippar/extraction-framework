@@ -42,21 +42,6 @@ object RdfNamespace {
     prefixMap(prefix) = ns
     ns
   }
-
-  def getNamespace(uri: String): RdfNamespace ={
-    for(p <- prefixMap)
-      if(uri.startsWith(p._2.namespace))
-        return p._2
-    null
-  }
-
-  def resolvePrefix(uri: String): String ={
-    val parts = split(null, uri)
-    if(parts._1 != null)
-      parts._1.append(parts._2)
-    else
-      uri
-  }
   
   // FIXME: move these to mappings wiki
   
@@ -88,8 +73,6 @@ object RdfNamespace {
   val FNO = ns("fno", "http://w3id.org/function/ontology#")
   val DBF = ns("dbf", "http://dbpedia.org/function/")
   val CRML = ns("crml", "http://semweb.mmlab.be/ns/crml#")
-  val NIF = ns("nif", "http://persistence.uni-leipzig.org/nlp2rdf/ontologies/nif-core#")
-  val HTML = ns("html", "http://www.w3.org/1999/xhtml/")
 
   //the following namespaces are required for supporting the entries in the mappings Wiki as of 2014-07-15
   val CIDOCCRM = ns("cidoccrm", "http://purl.org/NET/cidoc-crm/core#", false)
@@ -100,15 +83,8 @@ object RdfNamespace {
    */
   def split(default: RdfNamespace, name: String): (RdfNamespace, String) = {
     val parts = name.split(":", 2) // TODO: use name.split(":", -1) instead???
-    if (parts.size == 2 && prefixMap.contains(parts(0)))
-      (prefixMap(parts(0)), parts(1))
-    else {
-      val nss = getNamespace(name)
-      if(nss != null)
-        (nss, name.substring(nss.namespace.length))
-      else
-        (default, name)
-    }
+    if (parts.size == 2 && prefixMap.contains(parts(0))) (prefixMap(parts(0)), parts(1))
+    else (default, name)
   }
   
   /**

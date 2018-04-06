@@ -1,15 +1,16 @@
 package org.dbpedia.extraction.mappings
 
-import java.io.File
-
-import org.dbpedia.extraction.ontology.io.OntologyReader
-import org.dbpedia.extraction.sources.XMLSource
-import org.dbpedia.extraction.util.Language
 import org.dbpedia.extraction.wikiparser._
-import org.junit.runner.RunWith
+import org.dbpedia.extraction.sources.{WikiPage,FileSource,XMLSource,MemorySource}
+import org.dbpedia.extraction.destinations.Quad
+import org.dbpedia.extraction.util.Language
+import org.dbpedia.extraction.ontology.{Ontology, OntologyProperty}
+import org.dbpedia.extraction.ontology.io.OntologyReader
 import org.scalatest.FlatSpec
+import org.scalatest.matchers.{MatchResult, BeMatcher, ShouldMatchers}
+import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.ShouldMatchers
+import java.io.File
 
 @RunWith(classOf[JUnitRunner])
 class DateIntervalMappingTest extends FlatSpec with ShouldMatchers
@@ -139,7 +140,7 @@ class DateIntervalMappingTest extends FlatSpec with ShouldMatchers
         val page = new WikiPage(WikiTitle.parse("TestPage", lang), "{{foo|fooPeriod=" + input + "}}")
 
         wikiParser(page) match {
-          case Some(n) => dateIntervalMapping.extract(n.children(0).asInstanceOf[TemplateNode], "").map{case (quad) => quad.value}
+          case Some(n) => dateIntervalMapping.extract(n.children(0).asInstanceOf[TemplateNode], "", null).map{case (quad) => quad.value}
           case None => Seq()
         }
     }

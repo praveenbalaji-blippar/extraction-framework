@@ -1,16 +1,13 @@
 package org.dbpedia.extraction.sources;
 
 import org.dbpedia.extraction.util.Language;
-import org.dbpedia.extraction.util.RecordSeverity;
-import org.dbpedia.extraction.wikiparser.Namespace;
-import org.dbpedia.extraction.wikiparser.WikiPage;
-import org.dbpedia.extraction.wikiparser.WikiTitle;
+import org.dbpedia.extraction.wikiparser.*;
 import org.dbpedia.extraction.wikiparser.impl.wikipedia.Namespaces;
 import org.dbpedia.util.Exceptions;
 import org.dbpedia.util.text.xml.XMLStreamUtils;
-import scala.Enumeration;
+
 import scala.Function1;
-import scala.Tuple3;
+import scala.Option;
 import scala.util.control.ControlThrowable;
 
 import javax.xml.stream.XMLInputFactory;
@@ -18,13 +15,17 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.util.ArrayList;
 import java.util.NoSuchElementException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static javax.xml.stream.XMLStreamConstants.START_ELEMENT;
 
 public class WikipediaDumpParser
 {
+  /** the logger */
+  private static final Logger logger = Logger.getLogger(WikipediaDumpParser.class.getName());
+
   /** */
   private static final String ROOT_ELEM = "mediawiki";
   
@@ -196,14 +197,12 @@ public class WikipediaDumpParser
   private void readPage()
   throws XMLStreamException, InterruptedException
   {
-    //record any error or warning
-    ArrayList<Tuple3<String, Throwable, scala.Enumeration.Value>> records = new ArrayList<>();
-
     requireStartElement(PAGE_ELEM);
     nextTag();
     
     //Read title
     String titleStr = readString(TITLE_ELEM, true);
+    WikiTitle title = parseTitle(titleStr);
     // now after </title>
 
     int nsCode;
@@ -216,24 +215,6 @@ public class WikipediaDumpParser
       throw new IllegalArgumentException("cannot parse content of element ["+NS_ELEM+"] as int", e);
     }
 
-    //Read page id
-    String pageId = readString(ID_ELEM, false);
-    // now at </id>
-
-    //create title now with pageId
-
-      WikiTitle title = null;
-      try
-      {
-          title = parseTitle(titleStr, pageId);
-      }
-      catch (Exception e)
-      {
-          records.add(new Tuple3<String, Throwable, Enumeration.Value>("Error parsing page title " + titleStr, e, RecordSeverity.Warning()));
-          //logger.log(Level.WARNING, _language.wikiCode() + ": error parsing page title ["+titleString+"]: "+Exceptions.toString(e, 200));
-      }
-
-
     // now after </ns>
 
     if (title != null && title.namespace().code() != nsCode)
@@ -241,14 +222,12 @@ public class WikipediaDumpParser
       try
       {
         Namespace expNs = new Namespace(nsCode, Namespaces.names(_language).get(nsCode).get(), false);
-        records.add(new Tuple3<String, Throwable, Enumeration.Value>("Error parsing title: found namespace " + title.namespace() + ", expected " + expNs + " in title " + titleStr, null, RecordSeverity.Info()));
-        //logger.log(Level.WARNING, _language.wikiCode() + ": Error parsing title: found namespace " + title.namespace() + ", expected " + expNs + " in title " + titleStr);
+        logger.log(Level.WARNING, _language.wikiCode() + ": Error parsing title: found namespace " + title.namespace() + ", expected " + expNs + " in title " + titleStr);
         title.otherNamespace_$eq(expNs);
       }
       catch (NoSuchElementException e)
       {
-        records.add(new Tuple3<String, Throwable, Enumeration.Value>(String.format("Error parsing title: found namespace %s, title %s , key %s", title.namespace(),titleStr, nsCode), e, RecordSeverity.Warning()));
-        //logger.log(Level.WARNING, String.format(_language.wikiCode() + ": Error parsing title: found namespace %s, title %s , key %s", title.namespace(),titleStr, nsCode));
+        logger.log(Level.WARNING, String.format(_language.wikiCode() + ": Error parsing title: found namespace %s, title %s , key %s", title.namespace(),titleStr, nsCode));
         skipTitle();
         return;
       }
@@ -261,6 +240,10 @@ public class WikipediaDumpParser
       return;
     }
 
+    //Read page id
+    String pageId = readString(ID_ELEM, false);
+    // now at </id>
+
     //Read page
     WikiPage page = null;
     WikiTitle redirect = null;
@@ -268,15 +251,7 @@ public class WikipediaDumpParser
     {
       if (isStartElement(REDIRECT_ELEM))
       {
-        String titleString = _reader.getAttributeValue(null, TITLE_ELEM);
-        try
-        {
-          redirect = parseTitle(titleString, null);
-        }
-        catch (Exception e)
-        {
-          records.add(new Tuple3<String, Throwable, Enumeration.Value>("Error parsing page title " + titleString, e, RecordSeverity.Warning()));
-        }
+        redirect = parseTitle(_reader.getAttributeValue(null, TITLE_ELEM));
         nextTag();
         // now at </redirect>
       }
@@ -294,9 +269,6 @@ public class WikipediaDumpParser
     
     if (page != null)
     {
-      for(Tuple3<String, Throwable, scala.Enumeration.Value> record : records){
-        page.addExtractionRecord(record._1(), record._2(), record._3());
-      }
       try
       {
           _processor.apply(page);
@@ -306,9 +278,10 @@ public class WikipediaDumpParser
         // emulate Scala exception handling. Ugly...
         if (e instanceof ControlThrowable) throw Exceptions.unchecked(e);
         if (e instanceof InterruptedException) throw (InterruptedException)e;
-        else page.addExtractionRecord("Could not process page: " + page.title().encoded(), e, RecordSeverity.Warning());
+        else logger.log(Level.WARNING, _language.wikiCode() + ": error processing page  '"+title+"': "+Exceptions.toString(e, 200));
       }
     }
+    
     requireEndElement(PAGE_ELEM);
   }
 
@@ -410,17 +383,17 @@ public class WikipediaDumpParser
    * @param titleString expected name of element. if null, don't check name.
    * @return null if title cannot be parsed for some reason
    */
-  private WikiTitle parseTitle( String titleString, String pageId )
+  private WikiTitle parseTitle( String titleString )
   {
-    Long id = null;
-    if(pageId != null) {
-        try {
-            id = Long.parseLong(pageId);
-        } catch (Throwable e) {
-        }
+    try
+    {
+      return WikiTitle.parseCleanTitle(titleString, _language);
     }
-
-    return WikiTitle.parseCleanTitle(titleString, _language, scala.Option.apply(id));
+    catch (Exception e)
+    {
+      logger.log(Level.WARNING, _language.wikiCode() + ": error parsing page title ["+titleString+"]: "+Exceptions.toString(e, 200));
+      return null;
+    }
   }
 
   /**

@@ -13,7 +13,7 @@ object IgnoreListTest {
   
   def main(args: Array[String]) : Unit = {
     val dir = new File("src/main/statistics/")
-    val langs = Namespace.mappingLanguages
+    val langs = Namespace.mappings.keys
     println(langs.size)
     for (lang <- langs) {
       dir.resolve("ignorelist_"+lang.wikiCode+".txt") match{

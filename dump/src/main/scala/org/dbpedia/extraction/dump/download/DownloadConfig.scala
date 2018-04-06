@@ -1,66 +1,97 @@
 package org.dbpedia.extraction.dump.download
 
 import java.io.File
-import java.net.{MalformedURLException, URL}
+import java.net.{URL,MalformedURLException}
+import scala.collection.mutable.{Set,HashSet,Map,HashMap}
+import scala.io.{Source,Codec}
+import org.dbpedia.extraction.util.{ConfigUtils,Language}
+import org.dbpedia.extraction.wikiparser.Namespace
 
-import org.dbpedia.extraction.config.{Config, ConfigUtils}
-import org.dbpedia.extraction.util.{Finder, Language}
-
-import scala.collection.mutable
-import scala.util.matching.Regex
-import org.dbpedia.extraction.util.RichFile.wrapFile
-
-class DownloadConfig(path: String) extends Config(path)
+class DownloadConfig
 {
-  val baseUrl: URL = this.getArbitraryStringProperty("base-url") match {
-    case Some(u) => new URL(u)
-    case None => throw new IllegalArgumentException("Properties file is lacking this property: " + "base-url")
-  }
+  import DownloadConfig._
+
+  var wikiName = "wiki"
+
+  var baseUrl: URL = null
+  
+  var baseDir: File = null
+
+  // Files to download for each language
+  // lang -> Set(filename, isRegex)
+  val languages = new HashMap[Language, Set[(String, Boolean)]]
+
+  // Ranges to download for each language
+  // (start,end) -> Set(filename, isRegex)
+  val ranges = new HashMap[(Int,Int), Set[(String, Boolean)]]
+  
+  var dateRange = ("00000000","99999999")
   
   var dumpCount = 1
   
-  val retryMax: Int = this.getArbitraryStringProperty("retry-max") match {
-    case Some(u) => Integer.parseInt(u)
-    case None => throw new IllegalArgumentException("Properties file is lacking this property: " + "retry-max")
-  }
-
-  val retryMillis: Int = this.getArbitraryStringProperty("retry-millis") match {
-    case Some(u) => Integer.parseInt(u)
-    case None => throw new IllegalArgumentException("Properties file is lacking this property: " + "retry-millis")
-  }
-
-  val unzip: Boolean = this.getArbitraryStringProperty("unzip") match {
-    case Some(u) => u.toBoolean
-    case None => throw new IllegalArgumentException("Properties file is lacking this property: " + "unzip")
-  }
-
-  val dumpDate: Option[String] = this.getArbitraryStringProperty("dump-date") match {
-    case Some(u) if u.matches("\\d{8,8}") => Some(u)
-    case _ => None
+  var retryMax = 0
+  
+  var retryMillis = 10000
+  
+  var unzip = false
+  
+  var progressPretty = false
+  
+  /**
+   * Parse config in given file. Each line in file must be an argument as explained by usage overview.
+   */
+  def parse(file: File): Unit = {
+    val source = Source.fromFile(file)(Codec.UTF8)
+    try parse(file.getParentFile, source.getLines) 
+    finally source.close
   }
   
-  private def add[K](map: mutable.Map[K,mutable.Set[(String, Boolean)]], key: K, values: Array[(String, Boolean)]) =
-    map.getOrElseUpdate(key, new mutable.HashSet[(String, Boolean)]) ++= values
-
-  def getDownloadStarted(lang:Language): Option[File] ={
-    if(requireComplete){
-      val finder = new Finder[File](dumpDir, lang, wikiName)
-      val date = finder.dates(source.head).last
-      finder.file(date, DownloadConfig.Started) match {
-        case None => finder.file(date, DownloadConfig.Started)
-        case Some(x) => Some(x)
-      }
+  /**
+   * @param dir Context directory. Config file and base dir names will be resolved relative to 
+   * this path. If this method is called for a config file, this argument should be the directory
+   * of that file. Otherwise, this argument should be the current working directory (or null,
+   * which has the same effect).
+   */
+  def parse(dir: File, args: TraversableOnce[String]): Unit = {
+    
+    val DownloadFiles = new TwoListArg("download", ":", ",", "@")
+    
+    for (a <- args; arg = a.trim) arg match
+    {
+      case Ignored(_) => // ignore
+      case Arg("wikiName", wikiNameConfig) => wikiName = wikiNameConfig
+      case Arg("base-url", url) => baseUrl = toURL(if (url endsWith "/") url else url+"/", arg) // must have slash at end
+      case Arg("base-dir", path) => baseDir = resolveFile(dir, path)
+      case Arg("download-dates", range) => dateRange = parseDateRange(range, arg)
+      case Arg("download-count", count) => dumpCount = toInt(count, 1, Int.MaxValue, arg)
+      case Arg("retry-max", count) => retryMax = toInt(count, 1, Int.MaxValue, arg)
+      case Arg("retry-millis", millis) => retryMillis = toInt(millis, 0, Int.MaxValue, arg)
+      case Arg("unzip", bool) => unzip = toBoolean(bool, arg)
+      case Arg("pretty", bool) => progressPretty = toBoolean(bool, arg)
+      case Arg("config", path) =>
+        val file = resolveFile(dir, path)
+        if (! file.isFile) throw Usage("Invalid file "+file, arg)
+        parse(file)
+      case DownloadFiles(keys, files) =>
+        if (files.exists(_._1.isEmpty)) throw Usage("Invalid file name", arg)
+        for (key <- keys) key match {
+          // FIXME: copy & paste in ConfigUtils and extract.Config
+          case "@chapters" => for (language <- Namespace.chapters.keySet) add(languages, language, files)
+          case "@mappings" => for (language <- Namespace.mappings.keySet) add(languages, language, files)
+          case ConfigUtils.RangeRegex(from, to) => add(ranges, toRange(from, to, arg), files)
+          case ConfigUtils.LanguageRegex(code) => add(languages, Language(code), files)
+          case other => throw Usage("Invalid language / range '"+other+"'", arg)
+        }
+      case _ => throw Usage("Invalid argument '"+arg+"'")
     }
-    else
-      None
   }
+  
+  private def add[K](map: Map[K,Set[(String, Boolean)]], key: K, values: Array[(String, Boolean)]) =
+    map.getOrElseUpdate(key, new HashSet[(String, Boolean)]) ++= values
 }
 
 object DownloadConfig
 {
-  /** name of marker file in wiki directory */
-  private val Started = "download-started"
-
   def toBoolean(s: String, arg: String): Boolean =
     if (s == "true" || s == "false") s.toBoolean else throw Usage("Invalid boolean value", arg) 
   
@@ -70,7 +101,7 @@ object DownloadConfig
   }
   catch { case nfe: NumberFormatException => throw Usage("invalid range", arg, nfe) }
   
-  val DateRange: Regex = """(\d{8})?(?:-(\d{8})?)?""".r
+  val DateRange = """(\d{8})?(?:-(\d{8})?)?""".r
   
   def parseDateRange(range: String, arg: String): (String, String) = {
     range match {
@@ -124,7 +155,46 @@ object DownloadConfig
 object Usage {
   def apply(msg: String, arg: String = null, cause: Throwable = null): Exception = {
     val message = if (arg == null) msg else msg+" in '"+arg+"'"
-
+    
+    println(message)
+    val usage = /* empty line */ """
+Usage (with example values):
+config=/example/path/file.cfg
+  Path to exisiting UTF-8 text file whose lines contain arguments in the format given here.
+  Absolute or relative path. File paths in that config file will be interpreted relative to
+  the config file.
+base-url=http://dumps.wikimedia.org/
+  Base URL of dump server. Required if dump files are given.
+base-dir=/example/path
+  Path to existing target directory. Required.
+download-dates=20120530-20120610
+  Only dumps whose page date is in this range will be downloaded. By default, all dumps are 
+  included, starting with the newest. Open ranges like 20120530- or -20120610 are allowed.
+download-count=1
+  Max number of dumps to download. Default is 1.
+download=en,zh-yue,1000-2000,...:file1,file2,...
+  Download given files for given languages from server. Each key is either '@mappings', a language 
+  code, or a range. In the latter case, languages with a matching number of articles will be used. 
+  If the start of the range is omitted, 0 is used. If the end of the range is omitted, 
+  infinity is used. For each language, a new sub-directory is created in the target directory.
+  Each file is a file name like 'pages-articles.xml.bz2' or a regex if it starts with a '@' (useful for
+  multiple files processing, i.e. multiple parts of the same file) to which a prefix like
+ 'enwiki-20120307-' will be added. This argument can be used multiple times, for example
+  'download=en:foo.xml download=de:bar.xml'. '@mappings' means all languages that have a 
+   mapping namespace on http://mappings.dbpedia.org.
+retry-max=5
+  Number of total attempts if the download of a file fails. Default is no retries.
+retry-millis=1000
+  Milliseconds between attempts if the download of a file fails. Default is 10000 ms = 10 seconds.  
+unzip=true
+  Should downloaded .gz and .bz2 files be unzipped on the fly? Default is false.
+pretty=true
+  Should progress printer reuse one line? Doesn't work with log files, so default is false.
+Order is relevant - for single-value parameters, values read later overwrite earlier values.
+Empty arguments or arguments beginning with '#' are ignored.
+""" /* empty line */
+    println(usage)
+    
     new Exception(message, cause)
   }
 }

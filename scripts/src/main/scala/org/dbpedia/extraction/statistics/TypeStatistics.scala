@@ -1,12 +1,11 @@
 package org.dbpedia.extraction.statistics
 
-import java.io.{File, PrintWriter}
+import java.io.{PrintWriter, File}
 import java.util.concurrent.ConcurrentHashMap
-import java.util.logging.{Level, Logger}
-
-import org.dbpedia.extraction.scripts.QuadMapper
-import org.dbpedia.extraction.util.{Language, RichFile, SimpleWorkers, Workers}
+import org.dbpedia.extraction.scripts.QuadReader
+import org.dbpedia.extraction.util.{SimpleWorkers, Workers, RichFile, Language}
 import org.dbpedia.extraction.wikiparser.Namespace
+import java.util.logging.{Level, Logger}
 
 import scala.collection.convert.decorateAsScala._
 import scala.collection.mutable
@@ -19,13 +18,13 @@ object TypeStatistics {
   private var localized = false
   private var writeProps = false
   private var writeObjects = false
-  private val logger = Logger.getLogger(getClass.getName)
 
   def main(args: Array[String]): Unit = {
 
+    val logger = Logger.getLogger(getClass.getName)
 
     require(args != null && args.length >= 7,
-      "need at least 7 args: " +
+      "need at least three args: " +
         /*0*/ "base directory, " +
         /*1*/ "input file suffix (e.g. .ttl.bz2)" +
         /*2*/ "comma- or space-separated names of input files (e.g. 'instance_types,instance_types_transitive') without suffix, language or path!" +
@@ -35,7 +34,6 @@ object TypeStatistics {
         /*6*/ "listobjects / not - do not only count all objects instances, but list all objects with their pertaining occurrences" +
         /*7*/ "canonical identifier - (optional) part of the filename which identifies a canonical dataset (default: _en_uris, for 2015-04 its -en-uris)"
     )
-
 
     val baseDir = new File(args(0))
     require(baseDir.isDirectory, "basedir is not a directory")
@@ -60,7 +58,7 @@ object TypeStatistics {
     writeProps = args(5).toLowerCase == "listproperties"
     writeObjects = args(6).toLowerCase == "listobjects"
 
-    val canonicalStr = if(args.length < 8) "_wkd_uris" else args(7).trim
+    val canonicalStr = if(args.length == 7) "_en_uris" else args(7).trim
 
     val results = new ConcurrentHashMap[String, String]().asScala
 
@@ -87,7 +85,7 @@ object TypeStatistics {
       for(file <- inputFiles) {
         if(file.exists)
         {
-          new QuadMapper().readQuads(lang, file) { quad =>
+          QuadReader.readQuads(lang.wikiCode, file) { quad =>
             statements = statements +1
             subjects.get(quad.subject) match {
               case Some(s) => subjects += ((quad.subject, s + 1))
@@ -105,22 +103,20 @@ object TypeStatistics {
         }
       }
       results.put(lang.wikiCode, writeLang(lang.wikiCode, statements, subjects, props, objects))
-    }, Namespace.mappingLanguages.toList.sortBy(x => x))
+    }, Namespace.mappings.keySet.toList.sortBy(x => x))
 
     logger.log(Level.INFO, "finished calculations")
 
-    val sb = new StringBuilder()
+    val sb = new StringBuilder("{\n")
     for(langEntry <- results)
     {
-      if(sb.isEmpty)
-        sb.append("{\n")
-      else
-        sb.append(",\n")
       sb.append(langEntry._2)
+      sb.append(",\n")
     }
 
     val writer = new PrintWriter(outfile)
-    writer.write(sb.toString())
+    val res = sb.toString()
+    writer.write(res.substring(0, res.length-1))
     writer.write("\n}")
     writer.close()
     logger.log(Level.INFO, "finished writing output")

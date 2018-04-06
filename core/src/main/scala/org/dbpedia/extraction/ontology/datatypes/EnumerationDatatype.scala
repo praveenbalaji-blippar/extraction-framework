@@ -1,7 +1,5 @@
 package org.dbpedia.extraction.ontology.datatypes
 
-import org.dbpedia.extraction.dataparser.ParseResult
-
 import scala.util.matching.Regex
 
 /**
@@ -20,14 +18,14 @@ class EnumerationDatatype(name : String) extends Datatype(name)
         literals = new Literal(name, keywords) :: literals
     }
     
-    def parse(text : String) : Option[ParseResult[String]] =
+    def parse(text : String) : Option[String] =
     {
         for( literal <- literals; _ <- literal.regex.findFirstIn(text) )
         {
-            return Some(ParseResult(literal.name))
+            return Some(literal.name)
         }
 
-        None
+        return None
     }
 
     private class Literal(val name : String, val keywords : List[String])

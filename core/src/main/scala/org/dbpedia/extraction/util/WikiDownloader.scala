@@ -6,7 +6,8 @@ import java.nio.charset.Charset
 
 import org.dbpedia.extraction.wikiparser.Namespace
 
-import javax.xml.stream.{XMLEventFactory,XMLInputFactory,XMLOutputFactory}
+import javax.xml.namespace.QName
+import javax.xml.stream.{XMLEventFactory,XMLEventReader,XMLInputFactory,XMLOutputFactory}
 
 import org.dbpedia.extraction.util.RichStartElement.richStartElement
 
@@ -19,16 +20,16 @@ import org.dbpedia.extraction.util.RichStartElement.richStartElement
 class WikiDownloader(val apiUrl : String) {
   
   // TODO: get the charset from the URL? Difficult - writing starts before reading.
-  val charset: Charset = Charset.forName("UTF-8")
+  val charset = Charset.forName("UTF-8")
   
   // newInstance() is deprecated, but the newer methods don't exist in many JDK 6 versions
-  val inFactory: XMLInputFactory = XMLInputFactory.newInstance
-  val outFactory: XMLOutputFactory = XMLOutputFactory.newInstance
-  val events: XMLEventFactory = XMLEventFactory.newInstance
+  val inFactory = XMLInputFactory.newInstance
+  val outFactory = XMLOutputFactory.newInstance
+  val events = XMLEventFactory.newInstance
   
   def buildURL(namespace : Namespace, gapcontinue : String) : URL = 
   {
-    val sb = new StringBuilder
+    var sb = new StringBuilder
     sb append apiUrl
     sb append "?action=query&generator=allpages&prop=revisions&rvprop=ids|content|timestamp&format=xml"
     sb append "&gapnamespace=" append namespace.code append "&gaplimit=50"
@@ -51,9 +52,9 @@ class WikiDownloader(val apiUrl : String) {
           for (namespace <- namespaces) addPages(namespace, out)
         }
       }
-      xmlOut.close()
+      xmlOut.close
     }
-    finally stream.close()
+    finally stream.close
   }
     
   def addPages(namespace : Namespace, out : XMLEventBuilder) : Unit =
@@ -100,9 +101,9 @@ class WikiDownloader(val apiUrl : String) {
             }
           }
         }
-        xmlIn.close()
+        xmlIn.close
       }
-      finally stream.close()
+      finally stream.close
     } while (gapcontinue != null)
   }
   

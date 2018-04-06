@@ -1,7 +1,5 @@
 package org.dbpedia.extraction.destinations
 
-import org.dbpedia.extraction.transform.Quad
-
 /**
  * A destination for Live extraction.
  * The write function separates add, remove & unmodified quads

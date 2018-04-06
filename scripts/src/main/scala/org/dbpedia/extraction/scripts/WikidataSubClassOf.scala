@@ -1,22 +1,25 @@
 package org.dbpedia.extraction.scripts
 
-import java.io.{File, PrintWriter, StringWriter}
+import java.io.{PrintWriter, StringWriter, File, Writer}
+import java.lang.annotation.Annotation
 import java.net.URL
 import java.util.Properties
 
+import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.dbpedia.extraction.config.{Config, ConfigUtils}
-import org.dbpedia.extraction.config.provenance.DBpediaDatasets
 import org.dbpedia.extraction.destinations._
-import org.dbpedia.extraction.ontology.Ontology
+import org.dbpedia.extraction.destinations.formatters.Formatter
+import org.dbpedia.extraction.destinations.formatters.UriPolicy._
 import org.dbpedia.extraction.ontology.io.OntologyReader
+import org.dbpedia.extraction.ontology.{Ontology, OntologyClass, OntologyProperty}
 import org.dbpedia.extraction.sources.{WikiSource, XMLSource}
 import org.dbpedia.extraction.util.RichFile.wrapFile
-import org.dbpedia.extraction.util._
+import org.dbpedia.extraction.util.{ConfigUtils, Finder, IOUtils, Language}
 import org.dbpedia.extraction.wikiparser.Namespace
-
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import scala.IllegalArgumentException
 import scala.collection.mutable
+import scala.collection.mutable.{ArrayBuffer, HashMap}
 import scala.util.control.Breaks._
 
 /**
@@ -28,7 +31,6 @@ import scala.util.control.Breaks._
  * Then creates new mapping
  * dbo:Class: {owl:equivalentClass: Qx}  and writes to file
  *
-  * needs to be run after the redirection of the wikidata-raw dataset
  */
 
 object WikidataSubClassOf {
@@ -39,22 +41,25 @@ object WikidataSubClassOf {
 
   def main(args: Array[String]) {
 
+    require(args != null && args.length == 2, "Two arguments required, extraction config file and extension to work with")
     require(args(0).nonEmpty, "missing required argument: config file name")
+    require(args(1).nonEmpty, "missing required argument: suffix e.g. .tql.gz")
 
-    val config = new Config(args(0))
-    val suffix = config.inputSuffix match { case Some(s) => s}
-    val rawDataset = DBpediaDatasets.WikidataRawRedirected.filenameEncoded + suffix
+    val config = ConfigUtils.loadConfig(args(0), "UTF-8")
+    val suffix = args(1)
+    val subClassOfDataset = DBpediaDatasets.WikidataR2R_ontology.name + "." + suffix
+    val rawDataset = DBpediaDatasets.WikidataRawRedirected.name + "." + suffix
 
-    val baseDir = config.dumpDir
+    val baseDir = ConfigUtils.getValue(config, "base-dir", true)(new File(_))
     if (!baseDir.exists)
       throw new scala.IllegalArgumentException("dir " + baseDir + " does not exist")
 
-    val finder = new DateFinder(baseDir, Language.Wikidata)
-    finder.byName(rawDataset, auto = true)
-    val ontology = new OntologyReader().read( XMLSource.fromFile(config.ontologyFile, Language.Mappings))
+    val finder = new Finder[File](baseDir, Language.Wikidata, "wiki")
+    val date = finder.dates().last
+    val ontology = getOntology(config)
 
     // use integers in the map [superClass -> set[subclasses]]
-    val wkdSubClassMap = getWikidataSubClassOfMap(rawDataset, finder)
+    val wkdSubClassMap = getWikidataSubClassOfMap(rawDataset, finder, date)
     val wkdEquivMap: mutable.HashMap[Int, Option[String]] = new mutable.HashMap[Int, Option[String]]()
 
     // init all wikidata classes with None
@@ -101,7 +106,7 @@ object WikidataSubClassOf {
       // remove the opional
       .map(x => ("Q"+x._1.toString(), x._2.get))
 
-    writeConfig(config.wikidataMappingsFile, wkdToDbpMappings)
+    writeConfig(wkdToDbpMappings)
 
   }
 
@@ -177,10 +182,10 @@ object WikidataSubClassOf {
 
   }
 
-  def getWikidataSubClassOfMap(rawDataset: String, finder: DateFinder[File]): mutable.Map[Int, mutable.Set[Int]] = {
+  def getWikidataSubClassOfMap(rawDataset: String, finder: Finder[File], date: String): mutable.Map[Int, mutable.Set[Int]] = {
     val wikidataSubClassMap = mutable.Map.empty[Int, mutable.Set[Int]]
     try {
-      new QuadMapper().readQuads(finder, rawDataset) { quad =>
+      QuadReader.readQuads("Reading subClassOf statements from " + rawDataset, finder.file(date, rawDataset).get) { quad =>
         if (quad.predicate.equals(subClassProperty)) {
 
           try {
@@ -191,8 +196,7 @@ object WikidataSubClassOf {
 
           } catch {
             case e: NumberFormatException =>
-              //FIXME forward to extraction recorder
-              Console.out.println(e.printStackTrace())
+              Console.err.println(e.printStackTrace())
           }
         }
       }
@@ -205,14 +209,14 @@ object WikidataSubClassOf {
     }
   }
 
-  private def writeConfig(outputFile: File, dbo_class_map: mutable.Map[String, String]): Unit = {
+  private def writeConfig(dbo_class_map: mutable.Map[String, String]): Unit = {
     val mapper = new ObjectMapper()
     mapper.registerModule(DefaultScalaModule)
     val json_out = new StringWriter
 
     mapper.writeValue(json_out, dbo_class_map)
     val json = json_out.toString()
-    val pw = new PrintWriter(outputFile)
+    val pw = new PrintWriter(new File("../dump/auto_generated_mapping.json"))
     pw.write(json)
     pw.close()
   }

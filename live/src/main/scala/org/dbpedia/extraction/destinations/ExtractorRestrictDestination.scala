@@ -1,7 +1,6 @@
 package org.dbpedia.extraction.destinations
 
 import org.dbpedia.extraction.live.helper.{ExtractorStatus, ExtractorSpecification}
-import org.dbpedia.extraction.transform.Quad
 import scala.collection.Seq
 import java.util.Map
 import collection.mutable.ArrayBuffer

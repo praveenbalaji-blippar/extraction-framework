@@ -1,11 +1,9 @@
 package org.dbpedia.extraction.destinations
 
-import org.dbpedia.extraction.transform.Quad
-
 /**
  * Base class for destinations that forward most calls to another destination.
  */
-abstract class WrapperDestination(val destination: Destination)
+abstract class WrapperDestination(destination: Destination)
 extends Destination
 {
     override def open() = destination.open()

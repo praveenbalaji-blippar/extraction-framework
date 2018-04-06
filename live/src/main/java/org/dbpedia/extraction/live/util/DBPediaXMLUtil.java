@@ -1,11 +1,18 @@
 package org.dbpedia.extraction.live.util;
 
-import org.dbpedia.extraction.live.record.*;
-import org.w3c.dom.Node;
-
-import javax.xml.xpath.XPathExpressionException;
 import java.net.URI;
 import java.net.URLEncoder;
+
+import javax.xml.xpath.XPathExpressionException;
+
+
+import org.dbpedia.extraction.live.record.DeletionRecord;
+import org.dbpedia.extraction.live.record.IRecord;
+import org.dbpedia.extraction.live.record.MediawikiTitle;
+import org.dbpedia.extraction.live.record.Record;
+import org.dbpedia.extraction.live.record.RecordContent;
+import org.dbpedia.extraction.live.record.RecordMetadata;
+import org.w3c.dom.Node;
 
 
 
@@ -41,7 +48,7 @@ public class DBPediaXMLUtil
 		String text = XPathUtil.evalToString(node, DBPediaXPathUtil.getTextExpr());
 
 		RecordMetadata metadata = new RecordMetadata(language, title, oaiId,
-				URI.create(wikipediaUri), revision, username, ip, userId);
+				new URI(wikipediaUri), revision, username, ip, userId);
 
 		RecordContent content = new RecordContent(text, revision, XMLUtil.toString(node));
 

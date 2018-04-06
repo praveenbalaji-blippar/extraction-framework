@@ -1,28 +1,25 @@
 package org.dbpedia.extraction.wikiparser
 
-import org.dbpedia.extraction.util.Language
-
 /**
  * Represents plain text.
  *
  * @param text The text
  * @param line The source line number where this text begins
  */
-case class TextNode(text : String, override val line : Int, lang: Language = null) extends Node(List.empty, line)
+case class TextNode(text : String, override val line : Int) extends Node(List.empty, line)
 {
-    def toWikiText: String = text
+    def toWikiText = text
     
-    def toPlainText: String = text
-
-    def getLanguage: Option[Language] = Option(lang)
+    def toPlainText = text
+    
     /**
      * Returns the text denoted by this node.
      */
     override protected def retrieveText(recurse: Boolean) = Some(text)
 
-    override def equals(obj: scala.Any): Boolean = obj match {
+    override def equals(obj: scala.Any) = obj match {
 
-        case otherTextNode : TextNode => otherTextNode.text.trim == text.trim // && otherTextNode.line == line)
+        case otherTextNode : TextNode => (otherTextNode.text.trim == text.trim) // && otherTextNode.line == line)
         case _ => false
 
     }

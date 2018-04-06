@@ -1,9 +1,8 @@
 package org.dbpedia.extraction.util
 
 import java.util.logging.{Level, Logger}
-import java.util.{Locale, MissingResourceException}
+import java.util.{MissingResourceException, Locale}
 
-import org.dbpedia.extraction.config.Config
 import org.dbpedia.extraction.ontology.{DBpediaNamespace, RdfNamespace}
 
 import scala.collection.mutable.HashMap
@@ -42,51 +41,46 @@ class Language private(
   val resourceUri: RdfNamespace,
   val propertyUri: RdfNamespace,
   val baseUri: String,
-  val apiUri: String,
-  val pages: Int
+  val apiUri: String
 )
 {
     val locale = new Locale(isoCode)
+
     
     /** 
      * Wikipedia dump files use this prefix (with underscores), e.g. be_x_old, but
      * Wikipedia domains use the wikiCode (with dashes), e.g. http://be-x-old.wikipedia.org
      */
-    val filePrefix: String = wikiCode.replace('-', '_')
+    val filePrefix = wikiCode.replace('-', '_')
     /**
      */
-    override def toString: String = "wiki="+wikiCode+",locale="+locale.getLanguage
+    override def toString = "wiki="+wikiCode+",locale="+locale.getLanguage
     
     // no need to override equals() and hashCode() - there is only one object for each value, so equality means identity. 
 }
 
 object Language extends (String => Language)
 {
-  implicit val wikiCodeOrdering: Ordering[Language] = Ordering.by[Language, String](_.name).reverse
+  implicit val wikiCodeOrdering = Ordering.by[Language, String](_.wikiCode)
 
-  val logger: Logger = Logger.getLogger(Language.getClass.getName)
+  val logger = Logger.getLogger(Language.getClass.getName)
 
   val wikipediaLanguageUrl = "https://noc.wikimedia.org/conf/langlist"
   
   val map: Map[String, Language] = locally {
+    
     def language(code : String, name: String, iso_1: String, iso_3: String): Language = {
-      val c = code.trim.toLowerCase
-      val baseDomain = if(c.trim.toLowerCase == "en") "dbpedia.org" else c + ".dbpedia.org"
       new Language(
-        c,
-        name.trim,
-        iso_1.trim,
-        iso_3.trim,
-        baseDomain,
-        "http://" + baseDomain,
-        new DBpediaNamespace("http://" + baseDomain + "/resource/"),
-        new DBpediaNamespace("http://" + baseDomain + "/property/"),
-        "http://"+c+".wikipedia.org",
-        "https://"+c+".wikipedia.org/w/api.php",
-        Config.wikiInfos.filter(x => x.wikicode == code) match{
-          case e if e.nonEmpty => e.head.pages
-          case _ => 0
-        }
+        code,
+        name,
+        iso_1,
+        iso_3,
+        code+".dbpedia.org",
+        "http://"+code+".dbpedia.org",
+        new DBpediaNamespace("http://"+code+".dbpedia.org/resource/"),
+        new DBpediaNamespace("http://"+code+".dbpedia.org/property/"),
+        "http://"+code+".wikipedia.org",
+        "https://"+code+".wikipedia.org/w/api.php"
       )
     }
 
@@ -101,23 +95,22 @@ object Language extends (String => Language)
         val properties = specialLangs.getMap(lang)
         properties.get("dbpediaDomain") match{
           case Some(dom) => languages(lang) = new Language(
-            properties("wikiCode").asText,
-            properties("name").asText,
-            properties("isoCode").asText,
-            properties("iso639_3").asText,
+            properties.get("wikiCode").get.asText,
+            properties.get("name").get.asText,
+            properties.get("isoCode").get.asText,
+            properties.get("iso639_3").get.asText,
             dom.asText,
-            properties("dbpediaUri").asText(),
-            new DBpediaNamespace(properties("resourceUri").asText),
-            new DBpediaNamespace(properties("propertyUri").asText),
-            properties("baseUri").asText,
-            properties("apiUri").asText,
-            properties("pages").asInt
+            properties.get("dbpediaUri").get.asText(),
+            new DBpediaNamespace(properties.get("resourceUri").get.asText),
+            new DBpediaNamespace(properties.get("propertyUri").get.asText),
+            properties.get("baseUri").get.asText,
+            properties.get("apiUri").get.asText
           )
-          case scala.None => languages(lang) = language(
-            properties("wikiCode").asText,
-            properties("name").asText,
-            properties("isoCode").asText,
-            properties("iso639_3").asText)
+          case None => languages(lang) = language(
+            properties.get("wikiCode").get.asText,
+            properties.get("name").get.asText,
+            properties.get("isoCode").get.asText,
+            properties.get("iso639_3").get.asText)
         }
       }
     }
@@ -141,32 +134,27 @@ object Language extends (String => Language)
   /**
    * English Wikipedia
    */
-  val English: Language = map("en")
+  val English = map("en")
   
   /**
    * DBpedia mappings wiki
    */
-  val Mappings: Language = map("mappings")
+  val Mappings = map("mappings")
   
   /**
    * Wikimedia commons
    */
-  val Commons: Language = map("commons")
+  val Commons = map("commons")
 
   /**
    * Wikimedia Wikidata
    */
-  val Wikidata: Language = map("wikidata")
+  val Wikidata = map("wikidata")
 
   /**
-    * The Core Directory as a quasi language
+    * Wikimedia Wikidata
     */
-  val Core: Language = map("core")
-
-  /**
-    * Alibi Language
-    */
-  val None: Language = map("none")
+  val Core = map("core")
 
   /**
    * Gets a language object for a Wikipedia language code.

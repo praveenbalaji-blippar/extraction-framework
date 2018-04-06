@@ -1,12 +1,10 @@
 package org.dbpedia.extraction.mappings
 
-import org.dbpedia.extraction.config.mappings.TopicalConceptsExtractorConfig
-import org.dbpedia.extraction.config.provenance.DBpediaDatasets
-import org.dbpedia.extraction.ontology.Ontology
-import org.dbpedia.extraction.transform.Quad
-import org.dbpedia.extraction.util.Language
 import org.dbpedia.extraction.wikiparser._
-
+import org.dbpedia.extraction.ontology.Ontology
+import org.dbpedia.extraction.util.{WikiUtil, Language}
+import org.dbpedia.extraction.config.mappings.TopicalConceptsExtractorConfig
+import org.dbpedia.extraction.destinations.{DBpediaDatasets, Dataset, Quad}
 import scala.language.reflectiveCalls
 
 /**
@@ -38,7 +36,7 @@ extends PageNodeExtractor
 
     override val datasets = Set(DBpediaDatasets.TopicalConcepts)
 
-    override def extract(page : PageNode, subjectUri : String): Seq[Quad] =
+    override def extract(page : PageNode, subjectUri : String, pageContext : PageContext): Seq[Quad] =
     {
         if (page.title.namespace == Namespace.Category)
         {
@@ -55,13 +53,13 @@ extends PageNodeExtractor
                         subjectUri,
                         skosSubjectProperty,
                         mainResource,
-                        template.sourceIri) ::
+                        template.sourceUri) ::
                     new Quad(context.language,
                         DBpediaDatasets.TopicalConcepts,
                         mainResource,
                         rdfTypeProperty,
                         skosSubjectClass.uri,
-                        template.sourceIri)
+                        template.sourceUri)
                     :: Nil)
                 }
 
