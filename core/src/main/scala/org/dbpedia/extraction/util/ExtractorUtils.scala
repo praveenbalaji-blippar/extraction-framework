@@ -1,13 +1,18 @@
 package org.dbpedia.extraction.util
 
-import java.util.Properties
-
 import org.dbpedia.extraction.mappings.Extractor
-import org.dbpedia.extraction.config.ConfigUtils.getStrings
-import org.dbpedia.extraction.util.Language.wikiCodeOrdering
 import org.dbpedia.extraction.wikiparser._
+import java.util.Properties
+import scala.collection.JavaConversions.asScalaSet
+import scala.collection.immutable.Map
+import scala.collection.immutable.SortedMap
+import org.dbpedia.extraction.util.Language.wikiCodeOrdering
+import org.dbpedia.extraction.util.ConfigUtils.{getStrings}
+import org.dbpedia.extraction.util.RichString.wrapString
 
-import scala.collection.immutable.{Map, SortedMap}
+import java.net.URLDecoder
+import java.math.BigInteger
+import java.security.MessageDigest
 
 /**
  * User: Dimitris Kontokostas
@@ -47,14 +52,14 @@ object ExtractorUtils {
     * */
   def loadExtractorsMapFromConfig(languages: Seq[Language], config: Properties): Map[Language, Seq[Class[_ <: Extractor[_]]]] = {
 
-    val stdExtractors = loadExtractorClassSeq(getStrings(config, "extractors", ",", false))
+    val stdExtractors = loadExtractorClassSeq(getStrings(config, "extractors", ',', false))
 
     val classes =
       (for(language <- languages)
         yield(
           language,
           // Standard extractors from "extractors" plus custom defined extractors from "extractors.xx"
-          (stdExtractors ++ getStrings(config, "extractors."+language.wikiCode, ",", false).map(loadExtractorClass)).distinct)
+          (stdExtractors ++ getStrings(config, "extractors."+language.wikiCode, ',', false).map(loadExtractorClass)).distinct)
       ).toMap
 
     // Sort keys

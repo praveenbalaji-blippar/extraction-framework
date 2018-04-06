@@ -1,7 +1,7 @@
 package org.dbpedia.extraction.mappings
 
-import org.dbpedia.extraction.config.Config
-import org.dbpedia.extraction.config.provenance.DBpediaDatasets
+import java.net.URL
+
 import org.dbpedia.extraction.ontology.Ontology
 import org.dbpedia.extraction.util.Language
 
@@ -12,14 +12,13 @@ import scala.language.reflectiveCalls
  * Description
  * Created: 5/19/14 9:21 AM
  */
-
 class AbstractExtractorWikipedia(
   context : {
     def ontology : Ontology
     def language : Language
-    def configFile : Config
   })
-  extends NifExtractor (context)
+  extends AbstractExtractor (context)
 {
-  override val datasets = Set(DBpediaDatasets.LongAbstracts, DBpediaDatasets.ShortAbstracts)
+
+  override def apiUrl = new URL("https://" + context.language.wikiCode + ".wikipedia.org/w/api.php")
 }

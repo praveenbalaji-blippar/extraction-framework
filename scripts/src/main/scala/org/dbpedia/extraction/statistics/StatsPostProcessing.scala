@@ -11,7 +11,6 @@ import scala.Console._
   * Created by Chile on 3/9/2016.
   */
 object StatsPostProcessing {
-  //TODO have a look at the JsonValue problem before release
   def main(args: Array[String]): Unit = {
 
     val logger = Logger.getLogger(getClass.getName)

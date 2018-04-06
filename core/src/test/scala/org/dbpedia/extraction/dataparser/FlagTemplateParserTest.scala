@@ -1,5 +1,6 @@
 package org.dbpedia.extraction.dataparser
 
+import org.dbpedia.extraction.sources.WikiPage
 import org.scalatest.matchers.ShouldMatchers
 import org.scalatest.FlatSpec
 import org.dbpedia.extraction.wikiparser._
@@ -131,7 +132,7 @@ class FlagTemplateParserTest extends FlatSpec with ShouldMatchers
         val flagParser = new FlagTemplateParser(context)
     
         parser(page) match {
-          case Some(n) => Some(flagParser.parse(n.children.head).getOrElse(return None).value.decoded)
+          case Some(n) => Some(flagParser.parse(n.children.head).getOrElse(return None).decoded)
           case None => None
         }
 

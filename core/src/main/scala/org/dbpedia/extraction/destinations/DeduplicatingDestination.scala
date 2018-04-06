@@ -1,7 +1,5 @@
 package org.dbpedia.extraction.destinations
 
-import org.dbpedia.extraction.transform.Quad
-
 import scala.collection.mutable.LinkedHashSet
 
 /**

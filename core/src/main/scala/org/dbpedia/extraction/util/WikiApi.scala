@@ -7,7 +7,8 @@ import javax.net.ssl.HttpsURLConnection
 import scala.xml.{XML, Elem, Node}
 import scala.collection.immutable.Seq
 import scala.language.postfixOps
-import org.dbpedia.extraction.wikiparser.{WikiPage, WikiTitle, Namespace}
+import org.dbpedia.extraction.wikiparser.{WikiTitle,Namespace}
+import org.dbpedia.extraction.sources.WikiPage
 
 import WikiApi._
 
@@ -157,7 +158,7 @@ class WikiApi(url: URL, language: Language)
             proc(
                 new WikiPage(
                     title           = WikiTitle.parse((page \ "@title").head.text, language),
-                    redirect        = null, //WikiTitle.parse((page \ "redirect" \ "@title").text, language),
+                    redirect        = null, // TODO: read redirect from XML
                     id              = (page \ "@pageid").head.text,
                     revision        = (rev \ "@revid").head.text,
                     timestamp       = (rev \ "@timestamp").head.text,
@@ -188,7 +189,6 @@ class WikiApi(url: URL, language: Language)
 
     /**
      * Returns a list of page IDs fo the pages for a certain wiki title
- *
      * @param title The title of the wiki
      * @param maxCount  the maximum number of matches
      * @return  A list of page IDs

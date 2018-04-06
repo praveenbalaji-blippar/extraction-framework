@@ -1,7 +1,6 @@
 package org.dbpedia.util.text.uri;
 
 import junit.framework.TestCase;
-import org.dbpedia.iri.UriDecoder;
 
 public class UriDecoderTest extends TestCase
 {

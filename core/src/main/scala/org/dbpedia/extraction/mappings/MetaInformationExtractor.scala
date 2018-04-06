@@ -1,13 +1,13 @@
 package org.dbpedia.extraction.mappings
 
-import org.dbpedia.extraction.config.provenance.DBpediaDatasets
 import org.dbpedia.extraction.ontology.Ontology
-import org.dbpedia.extraction.transform.Quad
 import org.dbpedia.extraction.util.Language
 import org.dbpedia.extraction.util.StringUtils._
 import org.dbpedia.extraction.wikiparser._
-
+import org.dbpedia.extraction.destinations.{DBpediaDatasets, Quad}
+import java.net.URI
 import scala.language.reflectiveCalls
+import org.dbpedia.extraction.sources.WikiPage
 
 /**
  * Created by IntelliJ IDEA.
@@ -30,7 +30,7 @@ class MetaInformationExtractor( context : {
 
   override val datasets = Set(DBpediaDatasets.RevisionMeta)
 
-  override def extract(page : WikiPage, subjectUri : String) : Seq[Quad] =
+  override def extract(page : WikiPage, subjectUri : String, pageContext : PageContext) : Seq[Quad] =
   {
     if(page.title.namespace != Namespace.Main) return Seq.empty
 
@@ -39,19 +39,19 @@ class MetaInformationExtractor( context : {
     val historyLink  = context.language.baseUri + "/w/index.php?title=" + page.title.encodedWithNamespace + "&action=history"
 
     val quadModificationDate = new Quad(context.language, DBpediaDatasets.RevisionMeta, subjectUri, modificationDatePredicate,
-      formatTimestamp(page.timestamp), page.sourceIri, datetime )
+      formatTimestamp(page.timestamp), page.sourceUri, datetime )
 
     val quadExtractionDate = new Quad(context.language, DBpediaDatasets.RevisionMeta, subjectUri, extractionDatePredicate,
-      formatCurrentTimestamp, page.sourceIri, datetime )
+      formatCurrentTimestamp, page.sourceUri, datetime )
 
     val quadEditlink = new Quad(context.language, DBpediaDatasets.RevisionMeta, subjectUri, editLinkPredicate,
-      editLink, page.sourceIri, null )
+      editLink, page.sourceUri, null )
 
     val quadRevisionlink = new Quad(context.language, DBpediaDatasets.RevisionMeta, subjectUri, revisionPredicate,
-      revisionLink, page.sourceIri, null )
+      revisionLink, page.sourceUri, null )
 
     val quadHistorylink = new Quad(context.language, DBpediaDatasets.RevisionMeta, subjectUri, historyPredicate,
-      historyLink, page.sourceIri, null )
+      historyLink, page.sourceUri, null )
 
 
     Seq(quadModificationDate, quadExtractionDate, quadEditlink, quadRevisionlink, quadHistorylink)

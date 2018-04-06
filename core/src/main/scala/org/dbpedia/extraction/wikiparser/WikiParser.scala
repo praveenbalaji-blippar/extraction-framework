@@ -1,5 +1,6 @@
 package org.dbpedia.extraction.wikiparser
 
+import org.dbpedia.extraction.sources.WikiPage
 import org.dbpedia.extraction.wikiparser.impl.WikiParserWrapper
 
 /**

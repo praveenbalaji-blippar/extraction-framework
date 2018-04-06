@@ -1,13 +1,12 @@
 package org.dbpedia.extraction.scripts
 
-import java.io.File
-
-import org.dbpedia.extraction.config.ConfigUtils.parseLanguages
-import org.dbpedia.extraction.util.RichFile.wrapFile
+import org.dbpedia.extraction.destinations.Quad
 import org.dbpedia.extraction.util.{DateFinder, Language, SimpleWorkers}
-
+import org.dbpedia.extraction.util.ConfigUtils.parseLanguages
+import org.dbpedia.extraction.util.RichFile.wrapFile
+import scala.collection.mutable.{Set,HashMap,MultiMap,ArrayBuffer}
+import java.io.File
 import scala.Console.err
-import scala.collection.mutable.HashMap
 
 /**
  * Maps old URIs in triple files to new URIs:
@@ -98,16 +97,13 @@ object CanonicalizeUris {
     
     // Language using generic domain (usually en)
     val generic = if (args(6) == "-") null else Language(args(6))
-
-    val dbpPrefix = "http://dbpedia.org/"
-
-    def uriPrefix(language: Language): String = (if (language == generic) dbpPrefix else "http://" + language.dbpediaDomain)+"/"
+    
+    def uriPrefix(language: Language): String = "http://"+(if (language == generic) "dbpedia.org" else language.dbpediaDomain)+"/"      
     
     val newLanguage = Language(args(7))
     
     val newPrefix = uriPrefix(newLanguage)
     val newResource = newPrefix+"resource/"
-
     
     val languages = parseLanguages(baseDir, args.drop(8))
     require(languages.nonEmpty, "no languages")
@@ -124,9 +120,8 @@ object CanonicalizeUris {
       
       for (mappping <- mappings) {
         var count = 0
-        new QuadMapper().readQuads(finder, mappping + mappingSuffix, auto = true) { quad =>
-          if (quad.datatype != null)
-            throw new IllegalArgumentException(language.wikiCode+": expected object uri, found object literal: "+quad)
+        QuadReader.readQuads(finder, mappping + mappingSuffix, auto = true) { quad =>
+          if (quad.datatype != null) throw new IllegalArgumentException(language.wikiCode+": expected object uri, found object literal: "+quad)
           if (quad.value.startsWith(newResource)) {
             // TODO: this wastes a lot of space. Storing the part after ...dbpedia.org/resource/ would
             // be enough. Also, the fields of the Quad are derived by calling substring() on the whole 
@@ -144,12 +139,7 @@ object CanonicalizeUris {
       }
       
       def newUri(oldUri: String): String = {
-        //let our properties pass :)
-        //TODO maybe include a switch for this behavior?
-        if(oldUri.startsWith(dbpPrefix + "ontology") || oldUri.startsWith(dbpPrefix + "property"))
-          return oldUri
-        if (oldUri.startsWith(oldPrefix))
-          newPrefix + oldUri.substring(oldPrefix.length)
+        if (oldUri.startsWith(oldPrefix)) newPrefix + oldUri.substring(oldPrefix.length)
         else oldUri // not a DBpedia URI, copy it unchanged
       }
       
@@ -159,7 +149,7 @@ object CanonicalizeUris {
       }
       
       for (input <- inputs; suffix <- suffixes) {
-        new QuadMapper().mapQuads(finder, input + suffix, input + extension + suffix, required = false) { quad =>
+        QuadMapper.mapQuads(finder, input + suffix, input + extension + suffix, required = false) { quad =>
           val pred = newUri(quad.predicate)
           val subj = mapUri(quad.subject)
           if (subj == null) {
@@ -182,7 +172,7 @@ object CanonicalizeUris {
           }
         }
       }
-
+      
     }
     
     workers.start()

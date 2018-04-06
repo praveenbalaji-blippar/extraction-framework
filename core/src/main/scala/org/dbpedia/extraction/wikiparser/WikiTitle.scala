@@ -1,10 +1,13 @@
 package org.dbpedia.extraction.wikiparser
 
+import java.util.Locale
+import org.dbpedia.extraction.util.Language
+import org.dbpedia.extraction.util.WikiUtil
 import org.dbpedia.extraction.util.RichString.wrapString
-import org.dbpedia.extraction.util.{Language, WikiUtil}
-import org.dbpedia.iri.UriDecoder
-import org.dbpedia.util.text.ParseExceptionIgnorer
 import org.dbpedia.util.text.html.{HtmlCoder, XmlCodes}
+import org.dbpedia.util.text.ParseExceptionIgnorer
+import org.dbpedia.util.text.uri.UriDecoder
+import scala.collection.mutable.ListBuffer
 
 /**
  * Represents a page title. Or a link to a page.
@@ -22,17 +25,18 @@ class WikiTitle (
   val language: Language,
   val isInterLanguageLink: Boolean = false,
   val fragment: String = null,
-  val capitalizeLink : Boolean = true,
-  var id: Option[Long] = None
+  val capitalizeLink : Boolean = true
 )
 {
     if (decoded.isEmpty) throw new WikiParserException("page name must not be empty")
 
     /** Wiki-encoded page name (without namespace) e.g. Automobile_generation */
-    val encoded = if (capitalizeLink)
+    val encoded = if (capitalizeLink) {
         WikiUtil.wikiEncode(decoded).capitalize(language.locale)
-        else
-            WikiUtil.wikiEncode(decoded)
+    }
+    else {
+        WikiUtil.wikiEncode(decoded)
+    }
 
     /** Canonical page name with namespace e.g. "Template talk:Automobile generation" */
     val decodedWithNamespace = withNamespace(false)
@@ -56,17 +60,17 @@ class WikiTitle (
     /**
      * Returns useful info.
      */
-    override def toString(): String = {
+    override def toString() = {
       val frag = if (fragment == null) "" else ";fragment='"+fragment+"'"
-      "title="+decoded+";ns="+namespace+"/"+namespace.name(language)+";language:"+language+frag
+      "title="+decoded+";ns="+namespace+"/"+namespace.name(language)+";language:"+language+frag;
     }
 
     /**
      * TODO: also use fragment?
      */
-    override def equals(other : Any): Boolean = other match
+    override def equals(other : Any) = other match
     {
-        case title : WikiTitle => language == title.language && namespace == title.namespace && decoded == title.decoded
+        case title : WikiTitle => (language == title.language && namespace == title.namespace && decoded == title.decoded)
         case _ => false
     }
 
@@ -74,7 +78,7 @@ class WikiTitle (
      * TODO: do as Josh says in Effective Java, chapter 3.
      * TODO: also use fragment?
      */
-    override def hashCode(): Int = language.hashCode ^ decoded.hashCode ^ namespace.hashCode
+    override def hashCode() = language.hashCode ^ decoded.hashCode ^ namespace.hashCode
 
     /**
      * If somehow a different namespace is also given for this title, store it here. Otherwise,
@@ -87,7 +91,7 @@ class WikiTitle (
      * MySQL rightly complains about the duplicate title. As a workaround, we simply reject pages
      * for which the <ns> namespace doesn't fit the <title> namespace.
      */
-    var otherNamespace: Namespace = _
+    var otherNamespace: Namespace = null
 }
 
 object WikiTitle
@@ -185,7 +189,7 @@ object WikiTitle
      * @param title MediaWiki link e.g. "Template:Infobox Automobile"
      * @param language The source language of this link
      */
-    def parseCleanTitle(title: String, language: Language, id: Option[java.lang.Long]): WikiTitle = {
+    def parseCleanTitle(title: String, language: Language): WikiTitle = {
         var namespace = Namespace.Main
         var decodedName = title
 
@@ -198,12 +202,8 @@ object WikiTitle
             }
         }
 
-        val zwid = id match{
-            case Some(i) => Option(i.longValue())
-            case None => None
-        }
-
         // we explicitly disable capitalization of the title here
-        new WikiTitle(decodedName, namespace, language, false, null, false, zwid)
+        new WikiTitle(decodedName, namespace, language, false, null, false)
     }
+
 }

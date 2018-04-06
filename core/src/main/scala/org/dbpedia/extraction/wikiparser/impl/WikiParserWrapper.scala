@@ -1,6 +1,7 @@
 package org.dbpedia.extraction.wikiparser.impl
 
-import org.dbpedia.extraction.wikiparser.{WikiPage, PageNode, WikiParser}
+import org.dbpedia.extraction.wikiparser.{PageNode, WikiParser}
+import org.dbpedia.extraction.sources.WikiPage
 import org.dbpedia.extraction.wikiparser.impl.simple.SimpleWikiParser
 
 import json.JsonWikiParser
@@ -18,6 +19,7 @@ import org.dbpedia.extraction.wikiparser.impl.sweble.SwebleWrapper
 
 object WikiParserWrapper {
 
+  private val simpleWikiParser = new SimpleWikiParser()
   private val jsonParser = new JsonWikiParser()
   private val swebleWikiParser = new SwebleWrapper()
 
@@ -31,7 +33,7 @@ class WikiParserWrapper(wikiTextParserName: String) extends  WikiParser{
       //case "application/json" => jsonParser(page)  //obslete now after core refactoring
       case _ =>
         if (wikiTextParserName == null || wikiTextParserName.equals("simple")){
-          SimpleWikiParser(page)
+          simpleWikiParser(page)
         } else {
           swebleWikiParser(page)
         }

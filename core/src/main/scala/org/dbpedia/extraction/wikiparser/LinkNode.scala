@@ -1,6 +1,6 @@
 package org.dbpedia.extraction.wikiparser
 
-import org.dbpedia.iri.IRI
+import java.net.URI
 
 /**
  * Represents a Link.
@@ -29,7 +29,7 @@ extends LinkNode(children, line)
  * @param children The nodes of the label of this link
  * @param line The source line number of this link
  */
-case class ExternalLinkNode(destination : IRI, override val children : List[Node], override val line : Int, destinationNodes : List[Node] = List[Node]())
+case class ExternalLinkNode(destination : URI, override val children : List[Node], override val line : Int, destinationNodes : List[Node] = List[Node]())
 extends LinkNode(children, line)
 {
     def toWikiText = "[" + destination.toString + " " + children.map(_.toWikiText).mkString + "]"

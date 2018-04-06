@@ -12,22 +12,22 @@ import scala.language.postfixOps
  */
 object BooleanParser extends DataParser
 {
-  private val FALSE_REGEX = """(?i)(?:.*\s)*(no|false)(?:\s.*)*""".r
-  private val TRUE_REGEX = """(?i)(?:.*\s)*(yes|true)(?:\s.*)*""".r
+  val FALSE_REGEX = """(?i)(?:.*\s)*(no|false)(?:\s.*)*""".r
+  val TRUE_REGEX = """(?i)(?:.*\s)*(yes|true)(?:\s.*)*""".r
   
-  override def parse( node : Node ) : Option[ParseResult[Boolean]] =
+  override def parse( node : Node ) : Option[Boolean] =
   {
     // Note: BooleanParser.php only checked the children, not the node itself.
     for (child <- node :: node.children; string <- child retrieveText)
     {
       string match
       {
-        case FALSE_REGEX(_) => return Some(ParseResult(false))
-        case TRUE_REGEX(_) => return Some(ParseResult(true))
+        case FALSE_REGEX(_) => return Some(false)
+        case TRUE_REGEX(_) => return Some(true)
         case _ =>
       }
     }
     
-    None
+    return None
   }
 }

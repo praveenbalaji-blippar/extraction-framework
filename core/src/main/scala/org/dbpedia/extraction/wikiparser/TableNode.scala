@@ -12,8 +12,7 @@ package org.dbpedia.extraction.wikiparser
  */
 case class TableNode( caption : Option[String],
                       override val children : List[TableRowNode],
-                      override val line : Int )
-  extends Node(children, line)
+                      override val line : Int ) extends Node(children, line)
 {
     def toWikiText = ""  //TODO implement!!!
     def toPlainText = ""  //TODO implement!!!

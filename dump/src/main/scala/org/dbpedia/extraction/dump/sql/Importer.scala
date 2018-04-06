@@ -1,38 +1,37 @@
 package org.dbpedia.extraction.dump.sql
 
-import org.dbpedia.extraction.sources.Source
-import org.dbpedia.extraction.util._
+import org.dbpedia.extraction.sources.{WikiPage, Source}
+import org.dbpedia.extraction.util.{Language, StringUtils}
 import java.lang.StringBuilder
 import java.sql.Connection
 import java.sql.SQLException
-
-import org.dbpedia.extraction.util.{RecordSeverity, WikiPageEntry}
-import org.dbpedia.extraction.wikiparser.WikiPage
-
 import scala.util.control.ControlThrowable
+import scala.Console._
 
 /**
  * This class is basically mwdumper's SqlWriter ported to Scala.
  */
-class Importer(conn: Connection, lang: Language, recorder: ExtractionRecorder[WikiPage]) {
-
-
+class Importer(conn: Connection, lang: Language = null) {
+  
+  private var failedPages = Map[Long, String]()
+  
+  private var pages = 0
+  
+  private val time = System.currentTimeMillis
+    
   def process(source: Source): Int = {
+    
     for (page <- source) {
+      pages += 1
       insertPageContent(page)
-      recorder.record(new WikiPageEntry(page))
+      if (pages % 2000 == 0) logPages()
     }
 
-    recorder.printLabeledLine("Retrying all failed pages:", RecordSeverity.Warning, lang, null, noLabel = true)
+    logPages()
+    for(fail <- failedPages)
+      println(lang.wikiCode + ": page failed to import: " + fail._1)
 
-    recorder.listFailedPages.get(lang) match{
-      case None =>
-      case Some(fails) => for(fail <- fails.keys.map(x => x._2))
-        if(!insertPageContent(fail))
-          recorder.printLabeledLine("Retrying all failed pages:", RecordSeverity.Warning, lang)
-    }
-
-    recorder.successfulPages(lang).toInt
+    pages
   }
   
   private def lengthUtf8(text: String): Int = {
@@ -106,7 +105,7 @@ class Importer(conn: Connection, lang: Language, recorder: ExtractionRecorder[Wi
     sql.append(')')
   }
   
-  private def insertPageContent(page: WikiPage): Boolean = {
+  private def insertPageContent(page: WikiPage): Unit = {
     val builder = new StringBuilder()
     val length = lengthUtf8(page.source)
     builder.append(writeInsertStatement(new Page(page.id, page.revision, page.title, page.redirect, length)))
@@ -119,15 +118,19 @@ class Importer(conn: Connection, lang: Language, recorder: ExtractionRecorder[Wi
     stmt.setEscapeProcessing(false)
     try {
       stmt.execute(builder.toString)
-      true
     }
     catch {
       // throw our own exception that our XML parser won't catch
-      case e: Throwable =>
-        recorder.failedRecord(page.uri, page, e, page.title.language)
-        false
+      case e: Throwable => println(lang.wikiCode + ": " + e.getClass.getSimpleName + " occurred for page: " + page.id + " - " + e.getMessage)      //catch unique key violations (which will occur...)
+      failedPages += (page.id -> e.getMessage)
     }
     finally stmt.close()
+  }
+  
+  private def logPages(): Unit = {
+    val millis = System.currentTimeMillis - time
+    println(lang.wikiCode + ": imported "+(pages - failedPages.size)+
+      " pages in "+StringUtils.prettyMillis(millis)+" ("+(millis.toDouble/pages)+" millis per page)")
   }
 }
 
@@ -135,5 +138,5 @@ class Importer(conn: Connection, lang: Language, recorder: ExtractionRecorder[Wi
  * An exception that our XML parser won't catch - it does't catch ControlThrowable.
  */
 class ImporterException(cause: SQLException)
-extends SQLException(cause.getMessage, cause.getSQLState, cause.getErrorCode, cause)
+extends SQLException(cause.getMessage(), cause.getSQLState(), cause.getErrorCode(), cause)
 with ControlThrowable

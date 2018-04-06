@@ -1,6 +1,6 @@
 package org.dbpedia.extraction.live.helper;
 
-import org.dbpedia.extraction.transform.Quad;
+import org.dbpedia.extraction.destinations.Quad;
 
 import java.util.ArrayList;
 

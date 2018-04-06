@@ -1,21 +1,17 @@
 package org.dbpedia.extraction.mappings
 
-import java.io.{File, FilenameFilter}
-
-import org.dbpedia.extraction.config.Config
-import org.dbpedia.extraction.sources.FileSource
-import org.dbpedia.extraction.util.{Language, MediaWikiConnector}
 import org.dbpedia.extraction.wikiparser._
+import org.dbpedia.extraction.sources.FileSource
+import org.dbpedia.extraction.util.Language
+import java.io.{FilenameFilter, File}
 import org.junit.{Ignore, Test}
 
 import scala.io.Source
-import scala.language.reflectiveCalls
 
 @Ignore  // unignore to test; MediaWiki server has to be in place
 class AbstractExtractorTest
 {
     private val testDataRootDir = new File("core/src/test/resources/org/dbpedia/extraction/mappings")
-    private val configFilePath = "extraction-framework/dump/extraction.nif.abstracts.properties"
 
     private val filter = new FilenameFilter
     {
@@ -45,7 +41,6 @@ class AbstractExtractorTest
     private val context = new {
         def ontology = throw new IllegalStateException("don't need Ontology for testing!!! don't call extract!")
         def language = Language.English
-        def configFile : Config = new Config(configFilePath)
     }
     private val extractor = new AbstractExtractor(context)
 
@@ -58,8 +53,7 @@ class AbstractExtractorTest
       //return empty Abstract in case that the parser Returned None
       //val generatedAbstract = extractor.retrievePage(n.title)
       parser(page) match {
-        case Some(n) => new MediaWikiConnector(context.configFile.mediawikiConnection, context.configFile.abstractParameters.abstractTags.split(","))
-          .retrievePage(page.title, context.configFile.abstractParameters.abstractQuery /*, generatedAbstract*/) match{
+        case Some(n) => extractor.retrievePage(page.title, page.id/*, generatedAbstract*/) match{
             case Some(l) => l
             case None => ""
         }

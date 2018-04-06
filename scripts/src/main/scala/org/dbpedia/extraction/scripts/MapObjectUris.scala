@@ -1,14 +1,12 @@
 package org.dbpedia.extraction.scripts
 
-import java.io.File
-
-import org.apache.jena.ext.com.google.common.collect.{Multimaps, TreeMultimap}
-import org.dbpedia.extraction.config.ConfigUtils.parseLanguages
+import org.dbpedia.extraction.util.ConfigUtils.parseLanguages
 import org.dbpedia.extraction.util.RichFile.wrapFile
-import org.dbpedia.extraction.util.{DateFinder, Language, SimpleWorkers, Workers}
-
+import scala.collection.mutable
+import scala.collection.mutable.Set
+import java.io.File
 import scala.Console.err
-import scala.collection.convert.decorateAsScala._
+import org.dbpedia.extraction.util.{Language, DateFinder, Workers, SimpleWorkers}
 
 /**
  * Maps old object URIs in triple files to new object URIs:
@@ -120,11 +118,11 @@ object MapObjectUris {
 
     for (language <- languages) {
       val finder = new DateFinder(baseDir, language)
-      val map = Multimaps.synchronizedSortedSetMultimap[String, String](TreeMultimap.create[String, String]())
+      val map = new mutable.HashMap[String, mutable.Set[String]] with mutable.MultiMap[String, String] with mutable.SynchronizedMap[String, Set[String]]
 
-        Workers.work(SimpleWorkers(1.5, 1.0) { mapping: String =>
+      Workers.work(SimpleWorkers(1.5, 1.0) { mapping: String =>
         var count = 0
-        new QuadMapper().readQuads(finder, mapping + mappingSuffix, auto = true) { quad =>
+        QuadReader.readQuads(finder, mapping + mappingSuffix, auto = true) { quad =>
           if (quad.datatype != null) throw new IllegalArgumentException(mapping + ": expected object uri, found object literal: " + quad)
           // TODO: this wastes a lot of space. Storing the part after ...dbpedia.org/resource/ would
           // be enough. Also, the fields of the Quad are derived by calling substring() on the whole
@@ -133,7 +131,7 @@ object MapObjectUris {
           // - only store the resource title in the map
           // - use new String(quad.subject), new String(quad.value) to cut the link to the whole line
           // - maybe use an index of titles as in ProcessInterLanguageLinks to avoid storing duplicate titles
-          map.put(quad.subject, quad.value)
+          map.addBinding(quad.subject, quad.value)
           count += 1
         }
         err.println(mapping + ": found " + count + " mappings")
@@ -143,19 +141,18 @@ object MapObjectUris {
         var count = 0
         val inputFile = if(isExternal) new File(secondary, input._1 + input._2) else finder.byName(input._1 + input._2, auto = true).get
         val outputFile = if(isExternal) new File(secondary, input._1 + extension + input._2) else finder.byName(input._1 + extension + input._2, auto = true).get
-        new QuadMapper().mapQuads(language, inputFile, outputFile) { quad =>
+        val tag = if(isExternal) input._1 else language.wikiCode
+        QuadMapper.mapQuads(tag, inputFile, outputFile, required = true) { quad =>
           if (quad.datatype != null) List(quad) // just copy quad with literal values. TODO: make this configurable
-          else {
-            val uris = map.get(quad.value).asScala
-            count = count + 1
-            val ret = for (uri <- uris)
-              yield quad.copy(
-                value = uri, // change object URI
-                context = if (quad.context == null) quad.context else quad.context + "&objectMappedFrom=" + quad.value) // add change provenance
-            if(ret.isEmpty)
-              List(quad)
-            else
-              ret
+          else map.get(quad.value) match {
+            case Some(uris) => {
+              count = count +1
+              for (uri <- uris)
+                yield quad.copy(
+                  value = uri, // change object URI
+                  context = if (quad.context == null) quad.context else quad.context + "&objectMappedFrom=" + quad.value) // add change provenance
+            }
+            case None => List(quad) // just copy quad without mapping for object URI. TODO: make this configurable
           }
         }
         err.println(input._1 + ": changed " + count + " quads.")

@@ -1,8 +1,7 @@
 package org.dbpedia.extraction.mappings
 
-import org.dbpedia.extraction.config.provenance.DBpediaDatasets
+import org.dbpedia.extraction.destinations.{DBpediaDatasets, Dataset, Quad}
 import org.dbpedia.extraction.ontology.Ontology
-import org.dbpedia.extraction.transform.Quad
 import org.dbpedia.extraction.util.{Language, WikidataUtil}
 import org.dbpedia.extraction.wikiparser.JsonNode
 import org.wikidata.wdtk.datamodel.interfaces.ValueSnak
@@ -29,7 +28,7 @@ class WikidataReferenceExtractor(
 
   override val datasets = Set(DBpediaDatasets.WikidataReference)
 
-  override def extract(page: JsonNode, subjectUri: String): Seq[Quad] = {
+  override def extract(page: JsonNode, subjectUri: String, pageContext: PageContext): Seq[Quad] = {
     val quads = new ArrayBuffer[Quad]()
 
     for (statementGroup <- page.wikiDataDocument.getStatementGroups) {
@@ -45,7 +44,7 @@ class WikidataReferenceExtractor(
                     val value = snak.getValue
                     val statementUri = WikidataUtil.getStatementUri(subjectUri, property, value)
                     val datatype = if (WikidataUtil.getDatatype(value) != null) context.ontology.datatypes(WikidataUtil.getDatatype(value)) else null
-                    quads += new Quad(context.language, DBpediaDatasets.WikidataReference, statementUri, referenceProperty, WikidataUtil.getValue(value), page.wikiPage.sourceIri, datatype)
+                    quads += new Quad(context.language, DBpediaDatasets.WikidataReference, statementUri, referenceProperty, WikidataUtil.getValue(value), page.wikiPage.sourceUri, datatype)
                   }
                   case _ =>
                 }

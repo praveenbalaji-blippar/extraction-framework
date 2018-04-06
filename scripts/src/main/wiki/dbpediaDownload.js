@@ -6,7 +6,6 @@ var datasets = {};
 var datasetList = null;
 var initCallback = null;
 var callbackParam = null;
-var canonicalSuffix = null;
 var initLangs = ["en", "fr", "wikidata", "commons"];
 
 var tableConfig = {
@@ -20,12 +19,11 @@ var tableConfig = {
 var selected = null;
 var table = null;
 
-function init(catalogUrl, callback, params, canon)
+function init(catalogUrl, callback, params)
 {
     sendRequest(catalogUrl, "GET", null, true, catalogLoaded, function () {});
     initCallback = callback;
     callbackParam = params;
-    canonicalSuffix = canon;
 }
 
 function tabulate(columns) {
@@ -65,7 +63,7 @@ function tabulate(columns) {
         colSpanCols.push(columns[i]);
         colSpanCols.push("-");
 
-        var langLink = getRootDataset(columns[i])["dc:language"]["@id"];
+        var langLink = getRootDataset(columns[i])["dc:language"]["@id"]
 
         th2.append("th");
         th2.append("th");
@@ -77,7 +75,7 @@ function tabulate(columns) {
     // create a row for each object in the data
     var rows = tbody.selectAll("tr")
         .data(datasetList.filter(function(item){
-            if(item.id.indexOf("en_uris") >= 0 || item.id.indexOf("wkd_uris") >= 0)
+            if(item.indexOf("en uris") >= 0)
                 return false;
             else
                 return true;}))
@@ -101,13 +99,12 @@ function tabulate(columns) {
                 return "right";
         })
         .html(function(d) {
-            if(d.row.id.indexOf("en_uris") == -1 && d.row.id.indexOf("wkd_uris") == -1) {
+            if(d.row.indexOf("en uris") == -1) {
                 if (d.column == "dataset")
                 {
                     canCell = null;
-                    //TODO update this link
-                    var url = "http://wiki.dbpedia.org/services-resources/documentation/datasets#" + d.row.title.replace(/\s/g,'');
-                    return "<strong><a href=\"" + url + "\">" + d.row.title + "</a></strong>";
+                    var url = "http://wiki.dbpedia.org/services-resources/documentation/datasets#" + d.row.replace(/\s/g,'');
+                    return "<strong><a href=\"" + url + "\">" + d.row + "</a></strong>";
                 }
                 if (d.column == "-") {
                     if(canCell != null)
@@ -115,8 +112,8 @@ function tabulate(columns) {
                     else
                         return "<p> </p>";
                 }
-                canCell = {lang: d.column, set: d.row.id + canonicalSuffix};
-                return fillTd(d.column, d.row.id, false);
+                canCell = {lang: d.column, set: d.row + " en uris"};
+                return fillTd(d.column, d.row, false);
             }
         })
         .on("mouseout", mapMouseOut)
@@ -144,9 +141,9 @@ function tabulate(columns) {
         var dll = getIfContains(obj["dcat:downloadURL"], "http://downloads.dbpedia.org", "@id");
         var ret = "<small><a href=\"" + dll + "\" ";
         if(isCononicalized)
-            ret += "title=\"Canonicalized&nbsp;version&nbsp;of&nbsp;" + row.replace(canonicalSuffix, "");
+            ret += "title=\"Canonicalized&nbsp;version&nbsp;of&nbsp;" + row.replace(" en uris", "");
         else
-            ret += "title=\"Localized&nbsp;version&nbsp;of&nbsp;" + row.replace(canonicalSuffix, "");
+            ret += "title=\"Localized&nbsp;version&nbsp;of&nbsp;" + row.replace(" en uris", "");
 
         if(datasets[column][row]["void:triples"])
             ret += ";&nbsp;Triples:&nbsp;" + readableNumber(datasets[column][row]["void:triples"]["@value"], 1000);
@@ -161,7 +158,7 @@ function tabulate(columns) {
         ret += "</a>&nbsp;";
 
         if(obj["dataid:preview"])
-            ret += "<a target=\"_blank\" href=\"" + obj["dataid:preview"]["@id"] + "\" title=\"preview&nbsp;file\">?</a>";
+            ret += "<a href=\"" + obj["dataid:preview"]["@id"] + "\" title=\"preview&nbsp;file\">?</a>";
 
         ret += "</small><br/>";
         return ret;
@@ -169,11 +166,11 @@ function tabulate(columns) {
 
     function getEnUrisId(id, column, row)
     {
-        if(datasets[column][row + canonicalSuffix] === undefined)
+        if(datasets[column][row + " en uris"] === undefined)
             return null;
         var extension = getSerializationExtension(id);
-        for(var i in datasets[column][row + canonicalSuffix]["dcat:distribution"]) {
-            var ret = datasets[column][row + canonicalSuffix]["dcat:distribution"][i]["@id"];
+        for(var i in datasets[column][row + " en uris"]["dcat:distribution"]) {
+            var ret = datasets[column][row + " en uris"]["dcat:distribution"][i]["@id"];
             if (ret.indexOf(extension + ".bz2") >= 0 || ret.indexOf(extension + ".gz") >= 0)
                 return ret;
         }
@@ -210,9 +207,9 @@ function tabulate(columns) {
 function getDatasetRow(data)
 {
     for(var i in initLangs)
-        if(datasets[initLangs[i]][data.row.id] !== undefined)
+        if(datasets[initLangs[i]][data.row] !== undefined)
         {
-            return datasets[initLangs[i]][data.row.id];
+            return datasets[initLangs[i]][data.row];
         }
 }
 
@@ -229,7 +226,7 @@ function langLoaded(e)
 {
     if(e.target.status < 205)
     {
-        var json = JSON.parse(e.target.responseText);
+        var json = JSON.parse(e.target.responseText)
         datasets[getLangFromUri(e.target["responseURL"])] = getDatasetsAndDistributionsById(json);
         var zw = Object.keys(datasets);
         if(zw.length == initLangs.length)
@@ -246,7 +243,7 @@ function catalogLoaded(e)
 {
     if(e.target.status < 205)
     {
-        var json = JSON.parse(e.target.responseText);
+        var json = JSON.parse(e.target.responseText)
         ids = getDataIDsFromCatalog(json);
         getLanguageJson(initLangs, langLoaded);
     }
@@ -277,10 +274,8 @@ function getDataIDsFromCatalog(catalog)
             for(var j = 0; j < catalog["@graph"][i]["dcat:record"].length; j++)
             {
                 var id = catalog["@graph"][i]["dcat:record"][j]["@id"];
-                var wikicode = getLangFromUri(id);
-                if(wikicode != "none" && wikicode != "core")
-                    ret[wikicode] = catalog["@graph"][i]["dcat:record"][j]["@id"];
 
+                ret[getLangFromUri(id)] = catalog["@graph"][i]["dcat:record"][j]["@id"];
             }
         }
     }
@@ -296,25 +291,18 @@ function getDatasetList(){
     var ret = [];
     for(var i in initLangs)
         ret = ret.concat(loadDatasetListOfLang(initLangs[i]));
-    //make this list unique
-    return ret.map(function(item){
-        return removeQuery(item["@id"]) + "--" + item["dc:title"]["@value"];
-    })
-        .filter(function(item, pos, self) {
-            return self.indexOf(item) == pos;
-        }).map(function(str){
-            return{id: str.substring(0, str.indexOf("--")), title: str.substring(str.indexOf("--")+2)}
-        });
+    return ret.filter(function(item, pos, self) {
+        return self.indexOf(item) == pos;
+    });
 }
 
 function loadDatasetListOfLang(lang)
 {
     var ret = [];
     for(var key in datasets[lang]) {
-        var title = datasets[lang][key]["dc:title"];
-        if (title) {
-            if(title["@value"].trim().length > 0 && title["@value"].toLowerCase().indexOf("main_dataset") == -1)
-                ret.push(datasets[lang][key]);
+        if (!key.startsWith("http://") && !key.startsWith("dataid:")) {
+            if(key.trim().length > 0 && key.toLowerCase().indexOf("root dataset") == -1)
+                ret.push(key);
         }
     }
     return ret;
@@ -323,26 +311,19 @@ function loadDatasetListOfLang(lang)
 function getDatasetsAndDistributionsById(id){
     var ret = {};
     for(var i = 0; i < id["@graph"].length; i++) {
-        if (subArrayTest(["dataid:Dataset"], id["@graph"][i]["@type"])) {
+        if (id["@graph"][i]["@type"] == "dataid:Dataset") {
             var title = id["@graph"][i]["dc:title"]["@value"];
             if(title !== undefined && title.trim().length > 0)
-                ret[removeQuery(id["@graph"][i]["@id"])] = id["@graph"][i];
+                ret[title] = id["@graph"][i];
         }
-        if (subArrayTest(["dataid:SingleFile"], id["@graph"][i]["@type"])) {
+        if (id["@graph"][i]["@type"] == "dataid:SingleFile") {
             ret[id["@graph"][i]["@id"]] = id["@graph"][i];
         }
-        if (subArrayTest(["dataid:MediaType"], id["@graph"][i]["@type"])) {
+        if (id["@graph"][i]["@type"] == "dataid:MediaType") {
             ret[id["@graph"][i]["@id"]] = id["@graph"][i];
         }
     }
     return ret;
-}
-
-function removeQuery(uri){
-    if(uri.indexOf("?") < 0)
-        return uri;
-    else
-        return uri.substring(0, uri.indexOf("?"))
 }
 
 function getLanguageId(id) {
@@ -369,7 +350,7 @@ function langsAllLoaded(e)
 function getRootDataset(lang)
 {
     for(var name in datasets[lang])
-        if(name.indexOf("main_dataset") >= 0)
+        if(name.indexOf("root dataset") >= 0)
             return datasets[lang][name]
 }
 
@@ -384,13 +365,13 @@ function insertOntologyTable()
     else
         owl = owl["@id"];
     if(owl.endsWith(".owl"))
-        nt = owl.replace(".owl", ".nt");
+        nt = owl.replace(".owl", ".nt")
     if(owl.endsWith(".nt"))
     {
-        nt = owl;
+        nt = owl
         owl = owl.replace(".nt", ".owl")
     }
-    ontoTable.html("<table><tbody><tr><td><strong>File</strong></td><td><strong>Serialization</strong></td></tr>" +
+    ontoTable.html("<table><tbody><tr><td><strong>Dataset</strong></td><td><strong>owl</strong></td></tr>" +
         "<tr><td><a href=\"" + document.URL + "#dbpedia-ontology\" name=\"odbpedia-ontology\">DBpedia Ontology</a></td>" +
         "<td><a href=\"" + owl + "\">owl</a><br><a href=\"" + nt + "\">nt</a></td></tr></tbody></table>");
 }
@@ -445,7 +426,6 @@ function reDrawTable(s)
 
         $('#langselect').chosen();
     });
-    //filter out empty visible rows
     $.fn.dataTableExt.afnFiltering.push(
         function( oSettings, aData, iDataIndex ) {
             return aData.slice(1).join('').trim().length > 0;

@@ -1,7 +1,6 @@
 package org.dbpedia.extraction.destinations
 
 import org.dbpedia.extraction.destinations.formatters.RDFJSONFormatter
-import org.dbpedia.extraction.transform.Quad
 import scala.collection.Seq
 import util.Sorting
 import org.dbpedia.extraction.live.storage.JSONCache

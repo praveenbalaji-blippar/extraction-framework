@@ -1,13 +1,12 @@
 package org.dbpedia.extraction.mappings
 
-import java.io.{File, IOException}
+import java.io.{IOException}
 
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import org.dbpedia.extraction.config.mappings.wikidata._
-import org.dbpedia.extraction.config.provenance.DBpediaDatasets
-import org.dbpedia.extraction.ontology.{OntologyProperty, _}
+import org.dbpedia.extraction.destinations.{DBpediaDatasets, Dataset, Quad}
+import org.dbpedia.extraction.ontology._
 import org.dbpedia.extraction.ontology.datatypes.Datatype
-import org.dbpedia.extraction.transform.Quad
 import org.dbpedia.extraction.util.{JsonConfig, Language, WikidataUtil}
 import org.dbpedia.extraction.wikiparser.{JsonNode, Namespace}
 import org.wikidata.wdtk.datamodel.interfaces._
@@ -17,12 +16,8 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.language.reflectiveCalls
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.dbpedia.extraction.config.Config
-
-import scala.collection.convert.decorateAsScala._
-import scala.language.{postfixOps, reflectiveCalls}
+import scala.language.postfixOps
 
 /**
  * Created by ali on 10/26/14.
@@ -45,16 +40,14 @@ class WikidataR2RExtractor(
                             context: {
                               def ontology: Ontology
                               def language: Language
-                              def configFile: Config
                             }
                             )
   extends JsonNodeExtractor {
 
-  val config: JsonConfig = new JsonConfig(getClass.getClassLoader.getResource("wikidatar2r.json"))
-  var equivalentProperties: Map[String, Set[String]] = context.ontology.wikidataPropertiesMap.map(x => x._1 -> x._2.map(y => y.uri))
+  val config: JsonConfig = new JsonConfig(this.getClass.getResource("wikidatar2rconfig.json"))
 
   //class mappings generated with script WikidataSubClassOf and written to json file.
-  val classMappings = readClassMappings(context.configFile.wikidataMappingsFile)
+  val classMappings = readClassMappings("auto_generated_mapping.json")
 
   private val rdfType = context.ontology.properties("rdf:type")
   private val wikidataSplitIri = context.ontology.properties("wikidataSplitIri")
@@ -62,39 +55,28 @@ class WikidataR2RExtractor(
   private val rdfSubject = "http://www.w3.org/1999/02/22-rdf-syntax-ns#subject"
   private val rdfPredicate = "http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate"
   private val rdfObject = "http://www.w3.org/1999/02/22-rdf-syntax-ns#object"
-  private val wikidataProperrtyUri = "https://www.wikidata.org/wiki/Property"
 
   // this is where we will store the output
-  override val datasets = Set(
-    DBpediaDatasets.WikidataR2R_literals,
-    DBpediaDatasets.WikidataR2R_objects,
-    DBpediaDatasets.WikidataR2R_mappingerrors,
-    DBpediaDatasets.WikidataDublicateIriSplit,
-    DBpediaDatasets.WikidataReifiedR2R,
-    DBpediaDatasets.WikidataReifiedR2RQualifier,
-    DBpediaDatasets.GeoCoordinates,
-    DBpediaDatasets.Images,
-    DBpediaDatasets.OntologyTypes,
-    DBpediaDatasets.OntologyTypesTransitive,
-    DBpediaDatasets.WikidataSameAsExternal,
-    DBpediaDatasets.WikidataNameSpaceSameAs,
-    DBpediaDatasets.WikidataR2R_ontology,
-    DBpediaDatasets.WikidataTypeLikeStatements)
+  val WikidataR2RErrorDataset = new Dataset("wikidata-r2r-mapping-errors")
+  val WikidataDuplicateIRIDataset = new Dataset("wikidata-duplicate-iri-split")
+  override val datasets = Set(DBpediaDatasets.WikidataR2R_literals, DBpediaDatasets.WikidataR2R_objects, WikidataR2RErrorDataset,WikidataDuplicateIRIDataset,
+                              DBpediaDatasets.WikidataReifiedR2R, DBpediaDatasets.WikidataReifiedR2RQualifier, DBpediaDatasets.GeoCoordinates,
+                              DBpediaDatasets.Images, DBpediaDatasets.OntologyTypes, DBpediaDatasets.OntologyTypesTransitive,
+                              DBpediaDatasets.WikidataSameAsExternal, DBpediaDatasets.WikidataNameSpaceSameAs, DBpediaDatasets.WikidataR2R_ontology)
 
-  override def extract(page: JsonNode, subjectUri: String): Seq[Quad] = {
+  override def extract(page: JsonNode, subjectUri: String, pageContext: PageContext): Seq[Quad] = {
     // This array will hold all the triples we will extract
     val quads = new ArrayBuffer[Quad]()
 
     if (page.wikiPage.title.namespace != Namespace.WikidataProperty) {
       for ((statementGroup) <- page.wikiDataDocument.getStatementGroups) {
         val duplicateList = getDuplicates(statementGroup)
-        val statements = checkRank(statementGroup)
-        statements.foreach {
+        statementGroup.getStatements.foreach {
           statement => {
-            val claim = statement.getClaim
-            val property = claim.getMainSnak.getPropertyId.getId
+            val claim = statement.getClaim()
+            val property = claim.getMainSnak().getPropertyId().getId
             val equivPropertySet = getEquivalentProperties(property)
-            claim.getMainSnak match {
+            claim.getMainSnak() match {
               case mainSnak: ValueSnak => {
                 val value = mainSnak.getValue
 
@@ -105,15 +87,19 @@ class WikidataR2RExtractor(
 
                 val statementUri = WikidataUtil.getStatementUri(subjectUri, property, value)
 
-                val PV = property + " " + value
+                val PV = property + " " + value;
                 if (duplicateList.contains(PV)) {
-                  val statementUriWithHash = WikidataUtil.getStatementUriWithHash(subjectUri, property, value, statement.getStatementId)
-                  quads += new Quad(context.language, DBpediaDatasets.WikidataDublicateIriSplit, statementUri, wikidataSplitIri, statementUriWithHash, page.wikiPage.sourceIri, null)
+                  val statementUriWithHash = WikidataUtil.getStatementUriWithHash(subjectUri, property, value, statement.getStatementId.toString)
+                  quads += new Quad(context.language, WikidataDuplicateIRIDataset, statementUri, wikidataSplitIri, statementUriWithHash, page.wikiPage.sourceUri, null)
                 }
+
                 quads ++= getQuad(page, subjectUri, statementUri, receiver.getMap())
 
                 //Wikidata qualifiers R2R mapping
                 quads ++= getQualifersQuad(page, statementUri, claim)
+
+
+
               }
 
               case _ =>
@@ -123,22 +109,9 @@ class WikidataR2RExtractor(
         }
       }
     }
-
     splitDatasets(quads, subjectUri, page)
   }
 
-  def checkRank(statementGroup: StatementGroup): Seq[Statement] ={
-    var statements = Seq[Statement]();
-
-    //If statementGroup has preferred statement
-    statements = statementGroup.getStatements.filter(_.getRank.equals(StatementRank.PREFERRED));
-
-    //If there is no preferred statement, take all Normal statemnts
-    if (statements.isEmpty) {
-      statements = statementGroup.getStatements.filter(_.getRank.equals(StatementRank.NORMAL))
-    }
-    statements
-  }
   def getQuad(page: JsonNode, subjectUri: String,statementUri:String,map: mutable.Map[String, String]): ArrayBuffer[Quad] = {
     val quads = new ArrayBuffer[Quad]()
     map.foreach {
@@ -147,13 +120,13 @@ class WikidataR2RExtractor(
           val ontologyProperty = context.ontology.properties(propertyValue._1)
           val datatype = findType(null, ontologyProperty.range)
           if (propertyValue._2.startsWith("http:") && datatype != null && datatype.name == "xsd:string") {
-            quads += new Quad(context.language, DBpediaDatasets.WikidataR2R_mappingerrors, subjectUri, ontologyProperty, propertyValue._2.toString, page.wikiPage.sourceIri, datatype)
+            quads += new Quad(context.language, WikidataR2RErrorDataset, subjectUri, ontologyProperty, propertyValue._2.toString, page.wikiPage.sourceUri, datatype)
           } else {
 
             //split to literal / object datasets
             val mapDataset = if (ontologyProperty.isInstanceOf[OntologyObjectProperty]) DBpediaDatasets.WikidataR2R_objects else DBpediaDatasets.WikidataR2R_literals
             //Wikidata R2R mapping without reification
-            val quad = new Quad(context.language, mapDataset, subjectUri, ontologyProperty, propertyValue._2.toString, page.wikiPage.sourceIri, datatype)
+            val quad = new Quad(context.language, mapDataset, subjectUri, ontologyProperty, propertyValue._2.toString, page.wikiPage.sourceUri, datatype)
             quads += quad
 
             //Reification added to R2R mapping
@@ -171,10 +144,10 @@ class WikidataR2RExtractor(
   def getReificationQuads(page: JsonNode, statementUri: String, datatype: Datatype, quad: Quad): ArrayBuffer[Quad] = {
     val quads = new ArrayBuffer[Quad]()
 
-    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfType, rdfStatement, page.wikiPage.sourceIri)
-    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfSubject, quad.subject, page.wikiPage.sourceIri, null)
-    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfPredicate, quad.predicate, page.wikiPage.sourceIri, null)
-    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfObject, quad.value, page.wikiPage.sourceIri, datatype)
+    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfType, rdfStatement, page.wikiPage.sourceUri)
+    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfSubject, quad.subject, page.wikiPage.sourceUri, null)
+    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfPredicate, quad.predicate, page.wikiPage.sourceUri, null)
+    quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2R, statementUri, rdfObject, quad.value, page.wikiPage.sourceUri, datatype)
 
     quads
   }
@@ -208,7 +181,7 @@ class WikidataR2RExtractor(
                     val ontologyProperty = context.ontology.properties(mappedQualifierValue._1)
                     val datatype = if (ontologyProperty.range.isInstanceOf[Datatype]) ontologyProperty.range.asInstanceOf[Datatype] else null
                     quads += new Quad(context.language, DBpediaDatasets.WikidataReifiedR2RQualifier,
-                      statementUri, ontologyProperty, mappedQualifierValue._2, page.wikiPage.sourceIri, datatype)
+                      statementUri, ontologyProperty, mappedQualifierValue._2, page.wikiPage.sourceUri, datatype)
                   } catch {
                     case e: Exception => println("exception caught: " + e)
                   }
@@ -228,13 +201,14 @@ class WikidataR2RExtractor(
     var duplicateList = mutable.MutableList[String]();
     statementGroup.getStatements.foreach {
       statement => {
-        val claim = statement.getClaim
-        val property = claim.getMainSnak.getPropertyId.getId
-        claim.getMainSnak match {
-          case mainSnak: ValueSnak =>
+        val claim = statement.getClaim()
+        val property = claim.getMainSnak().getPropertyId().getId
+        claim.getMainSnak() match {
+          case mainSnak: ValueSnak => {
             val value = mainSnak.getValue
-            val PV = property + " " + value
-            duplicateList +=PV
+            val PV = property + " " + value;
+            duplicateList +=PV;
+            }
           case _ =>
         }
       }
@@ -245,36 +219,36 @@ class WikidataR2RExtractor(
 
   private def findType(datatype: Datatype, range: OntologyType): Datatype = {
     if (datatype != null) datatype
-    else range match {
-      case datatype: Datatype => datatype
-      case _ => null
-    }
+    else if (range.isInstanceOf[Datatype]) range.asInstanceOf[Datatype]
+    else null
   }
 
   private def getEquivalentClass(value: Value): Set[OntologyClass] = {
+    var classes = Set[OntologyClass]()
+
     value match {
-      case v: ItemIdValue =>
+      case v: ItemIdValue => {
         val wikidataItem = WikidataUtil.getItemId(v)
-          if (classMappings.nonEmpty){
-            classMappings.get(wikidataItem) match {
-              case Some(mappings) => return mappings
-              case None =>
-            }
+          classMappings.get(wikidataItem) match {
+            case Some(mappings) => classes++=mappings
+            case _=>
           }
+      }
       case _ =>
     }
-    Set()
+    classes
   }
 
-  private def readClassMappings(file: File): mutable.Map[String,Set[OntologyClass]] = {
+  private def readClassMappings(fileName:String): mutable.Map[String,Set[OntologyClass]] = {
     val finalMap = mutable.Map[String,Set[OntologyClass]]()
 
     try {
-      val source = scala.io.Source.fromFile(file)
+      val source = scala.io.Source.fromFile(fileName)
       val jsonString = source.getLines() mkString
       val mapper = new ObjectMapper() with ScalaObjectMapper
       mapper.registerModule(DefaultScalaModule)
       val mapFromJson = mapper.readValue[Map[String, String]](jsonString)
+
       mapFromJson.foreach{
         pair =>
           mapFromJson.get(pair._1) match {
@@ -288,21 +262,24 @@ class WikidataR2RExtractor(
       }
     } catch {
       case ioe: IOException => println("Please check class mapping file "+ioe)
-      case npe: NullPointerException=> println("Null pointer exception, file is empty" + npe)
     }
 
     context.ontology.wikidataClassesMap.foreach {
       classMap => finalMap+=classMap._1.replace("wikidata:","")->classMap._2
     }
 
-    finalMap
+    return finalMap
   }
 
-  private def getEquivalentProperties(property: String): Set[String] = {
-    equivalentProperties.get("wikidata:" + property) match{
-      case Some(x) => x
-      case None => Set[String]()
-    }
+  private def getEquivalentProperties(property: String): Set[OntologyProperty] = {
+    var properties = Set[OntologyProperty]()
+    val prop = "wikidata:" + property
+    context.ontology.wikidataPropertiesMap.foreach({ map =>
+      if (map._1.matches(prop)) {
+        properties ++= map._2
+      }
+    })
+    properties
   }
 
   /**
@@ -311,44 +288,44 @@ class WikidataR2RExtractor(
   private def splitDatasets(originalGraph: Seq[Quad], subjectUri : String, page: JsonNode) : Seq[Quad] = {
     val adjustedGraph = new ArrayBuffer[Quad]
 
-    originalGraph.foreach(q => {
-      if (q.dataset.equals(DBpediaDatasets.WikidataR2R_literals.encoded) || q.dataset.equals(DBpediaDatasets.WikidataR2R_objects.encoded)) {
+    originalGraph.map(q => {
+      if (q.dataset.equals(DBpediaDatasets.WikidataR2R_literals.name) || q.dataset.equals(DBpediaDatasets.WikidataR2R_objects.name)) {
         q.predicate match {
 
             // split type statements, some types e.g. cordinates go to separate datasets
           case "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" =>
             q.value match {
               case "http://www.w3.org/2003/01/geo/wgs84_pos#SpatialThing"
-                   => adjustedGraph += q.copy(dataset = DBpediaDatasets.GeoCoordinates.encoded)
+                   => adjustedGraph += q.copy(dataset = DBpediaDatasets.GeoCoordinates.name)
               case _ => // This is the deafult types we get
-                adjustedGraph += q.copy(dataset = DBpediaDatasets.OntologyTypes.encoded)
+                adjustedGraph += q.copy(dataset = DBpediaDatasets.OntologyTypes.name)
                 // Generate inferred types
                 context.ontology.classes.get(q.value.replace("http://dbpedia.org/ontology/", "")) match {
                   case Some(clazz) =>
                     for (cls <- clazz.relatedClasses.filter(_ != clazz))
-                      adjustedGraph += new Quad(context.language, DBpediaDatasets.OntologyTypesTransitive, subjectUri, rdfType, cls.uri, page.wikiPage.sourceIri)
+                      adjustedGraph += new Quad(context.language, DBpediaDatasets.OntologyTypesTransitive, subjectUri, rdfType, cls.uri, page.wikiPage.sourceUri)
                   case None =>
                 }
             }
 
           case "http://www.w3.org/2000/01/rdf-schema#subClassOf"
-                => adjustedGraph += q.copy(dataset = DBpediaDatasets.WikidataR2R_ontology.encoded)
+                => adjustedGraph += q.copy(dataset = DBpediaDatasets.WikidataR2R_ontology.name)
 
             // coordinates dataset
           case "http://www.w3.org/2003/01/geo/wgs84_pos#lat" | "http://www.w3.org/2003/01/geo/wgs84_pos#long" | "http://www.georss.org/georss/point"
-                => adjustedGraph += q.copy(dataset = DBpediaDatasets.GeoCoordinates.encoded)
+                => adjustedGraph += q.copy(dataset = DBpediaDatasets.GeoCoordinates.name)
 
             //Images dataset
           case  "http://xmlns.com/foaf/0.1/thumbnail" | "http://xmlns.com/foaf/0.1/depiction" | "http://dbpedia.org/ontology/thumbnail"
-                => adjustedGraph += q.copy(dataset = DBpediaDatasets.Images.encoded)
+                => adjustedGraph += q.copy(dataset = DBpediaDatasets.Images.name)
 
             // sameAs links
           case "http://www.w3.org/2002/07/owl#sameAs" =>
             // We get the commons:Creator links
             if (q.value.startsWith("http://commons.dbpedia.org")) {
-              adjustedGraph += q.copy(dataset = DBpediaDatasets.WikidataNameSpaceSameAs.encoded)
+              adjustedGraph += q.copy(dataset = DBpediaDatasets.WikidataNameSpaceSameAs.name)
             } else {
-              adjustedGraph += q.copy(dataset = DBpediaDatasets.WikidataSameAsExternal.encoded)
+              adjustedGraph += q.copy(dataset = DBpediaDatasets.WikidataSameAsExternal.name)
             }
 
           case _ => adjustedGraph += q

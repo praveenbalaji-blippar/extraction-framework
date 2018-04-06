@@ -2,9 +2,9 @@ package org.dbpedia.extraction.mappings
 
 import java.util.logging.Logger
 import org.dbpedia.extraction.config.mappings.FileTypeExtractorConfig
-import org.dbpedia.extraction.config.provenance.DBpediaDatasets
+import org.dbpedia.extraction.destinations.{DBpediaDatasets, Quad}
 import org.dbpedia.extraction.ontology.Ontology
-import org.dbpedia.extraction.transform.Quad
+import org.dbpedia.extraction.sources.WikiPage
 import org.dbpedia.extraction.util.{Language, ExtractorUtils}
 import org.dbpedia.extraction.wikiparser._
 import scala.language.reflectiveCalls
@@ -50,10 +50,10 @@ class FileTypeExtractor(context: {
      * Extract a single WikiPage. We guess the file type from the file extension
      * used by the page.
      */
-    override def extract(page: WikiPage, subjectUri: String) : Seq[Quad] =
+    override def extract(page: WikiPage, subjectUri: String, pageContext: PageContext) : Seq[Quad] =
     {
         // This extraction only works on File:s.
-        if(page.title.namespace != Namespace.File || page.isRedirect)
+        if(page.title.namespace != Namespace.File || page.redirect != null)
             return Seq.empty
 
         // Generate the fileURL.
@@ -65,7 +65,7 @@ class FileTypeExtractor(context: {
                 subjectUri,
                 dboFileURLProperty,
                 fileURL,
-                page.sourceIri,
+                page.sourceUri,
                 null
             )
         )
@@ -99,7 +99,7 @@ class FileTypeExtractor(context: {
                 subjectUri,
                 foafDepictionProperty,
                 fileURL,
-                page.sourceIri,
+                page.sourceUri,
                 null
             ), 
             // 2. <resource> thumbnail <image>
@@ -108,7 +108,7 @@ class FileTypeExtractor(context: {
                 subjectUri,
                 dboThumbnailProperty,
                 thumbnailURL,
-                page.sourceIri,
+                page.sourceUri,
                 null
             ),
             // 3. <image> foaf:thumbnail <image>
@@ -117,7 +117,7 @@ class FileTypeExtractor(context: {
                 fileURL,
                 foafThumbnailProperty,
                 thumbnailURL,
-                page.sourceIri,
+                page.sourceUri,
                 null
             )
         )
@@ -125,8 +125,7 @@ class FileTypeExtractor(context: {
 
     /**
      * Determine the extension of a WikiPage.
- *
-     * @return None if no extension exists, Some[String] if an extension was found.
+     * @returns None if no extension exists, Some[String] if an extension was found.
      */
     def extractExtension(page: WikiPage): Option[String] =
     {
@@ -163,7 +162,7 @@ class FileTypeExtractor(context: {
             subjectUri,
             fileExtensionProperty,
             extension,
-            page.sourceIri,
+            page.sourceUri,
             xsdString
         )
 
@@ -180,7 +179,7 @@ class FileTypeExtractor(context: {
             subjectUri,
             dctTypeProperty,
             fileTypeClass.uri,
-            page.sourceIri,
+            page.sourceUri,
             null
         )
             
@@ -190,7 +189,7 @@ class FileTypeExtractor(context: {
             subjectUri,
             dctFormatProperty,
             mimeType,
-            page.sourceIri,
+            page.sourceUri,
             xsdString
         )
 
@@ -201,7 +200,7 @@ class FileTypeExtractor(context: {
           subjectUri,
           rdfTypeProperty,
           dboFile.uri,
-          page.sourceIri,
+          page.sourceUri,
           null
         )
 
@@ -213,7 +212,7 @@ class FileTypeExtractor(context: {
                 subjectUri,
                 rdfTypeProperty,
                 rdfClass.uri,
-                page.sourceIri,
+                page.sourceUri,
                 null
             )
         )

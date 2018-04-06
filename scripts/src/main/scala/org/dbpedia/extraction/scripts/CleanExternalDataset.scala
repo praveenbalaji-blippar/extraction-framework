@@ -4,8 +4,7 @@ import java.io.File
 
 import org.apache.commons.lang3.StringEscapeUtils
 import org.dbpedia.extraction.util.RichFile.wrapFile
-import org.dbpedia.extraction.util.{Language, SimpleWorkers, Workers}
-import org.dbpedia.iri.UriUtils
+import org.dbpedia.extraction.util.{UriUtils, SimpleWorkers, Workers}
 
 import scala.Console._
 
@@ -44,22 +43,22 @@ object CleanExternalDataset {
     Workers.work(SimpleWorkers(1.5, 1.0) { input:File =>
       var changeCount = 0
       val outFile = new File(baseDir, input.name.substring(0, input.name.length - inSuffix.length) + outSuffix)
-      new QuadMapper().mapQuads(Language.Core, input, outFile, required = true) { quad =>
+      QuadMapper.mapQuads(input.name, input, outFile, required = true) { quad =>
         try {
           var changed = false
-          val subj = UriUtils.uriToDbpediaIri(quad.subject).toString
+          val subj = UriUtils.uriToIri(quad.subject)
           changed = changed || subj != quad.subject
-          val pred = UriUtils.uriToDbpediaIri(quad.predicate).toString
+          val pred = UriUtils.uriToIri(quad.predicate)
           changed = changed || pred != quad.predicate
           val obj = if (quad.datatype == null)
-            UriUtils.uriToDbpediaIri(quad.value).toString
+            UriUtils.uriToIri(quad.value)
           else if (quad.language != null || quad.datatype == "http://www.w3.org/2001/XMLSchema#string")
             StringEscapeUtils.unescapeJava(quad.value) //revert numeric and %- escape sequences
           else
             quad.value
           changed = changed || obj != quad.value
           val cont = if (quad.context != null)
-            UriUtils.uriToDbpediaIri(quad.context).toString
+            UriUtils.uriToIri(quad.context)
           else
             quad.context
           changed = changed || cont != quad.context

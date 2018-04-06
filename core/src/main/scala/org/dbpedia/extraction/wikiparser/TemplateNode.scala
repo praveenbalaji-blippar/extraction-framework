@@ -27,22 +27,19 @@ case class TemplateNode (
      */
     def property(key : String) : Option[PropertyNode] =
     {
-        propertyMap.get(key)
+        return propertyMap.get(key);
     }
 
     def keySet :  scala.collection.Set[String] = propertyMap.keySet
 
-    def toWikiText: String = "{{" + title.decoded + (if(children.isEmpty) "" else "|") + children.map(_.toWikiText).mkString("|") + "}}"
+    def toWikiText = "{{" + title.decoded + (if(children.isEmpty) "" else "|") + children.map(_.toWikiText).mkString("|") + "}}"
     
     // templates are skipped for plain text
     def toPlainText = ""
 
-    override def equals(obj: scala.Any): Boolean = obj match {
+    override def equals(obj: scala.Any) = obj match {
 
-        case otherTemplateNode : TemplateNode =>
-            otherTemplateNode.title == title &&
-          otherTemplateNode.line == line &&
-          NodeUtil.filterEmptyTextNodes(otherTemplateNode.children) == NodeUtil.filterEmptyTextNodes(children)
+        case otherTemplateNode : TemplateNode => (otherTemplateNode.title == title && otherTemplateNode.line == line && NodeUtil.filterEmptyTextNodes(otherTemplateNode.children) == NodeUtil.filterEmptyTextNodes(children))
         case _ => false
     }
 }
